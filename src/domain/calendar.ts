@@ -7,10 +7,26 @@ export type IsoDate = string; // "2026-11-03"
 
 const IST_OFFSET_MINUTES = 330;
 
-/** Calendar date in India for an instant. */
+/** Calendar date in India for an instant. Servers run in UTC; business dates never do. */
 export function toIstDate(instant: Date): IsoDate {
   const shifted = new Date(instant.getTime() + IST_OFFSET_MINUTES * 60_000);
   return shifted.toISOString().slice(0, 10);
+}
+
+/** Today's date in India — the only "today" business logic may use. */
+export function todayIst(now: Date = new Date()): IsoDate {
+  return toIstDate(now);
+}
+
+/** A Postgres DATE column (read by Prisma as UTC midnight) as "YYYY-MM-DD". */
+export function fromDbDate(value: Date): IsoDate {
+  return value.toISOString().slice(0, 10);
+}
+
+/** "YYYY-MM-DD" → the Date Prisma expects for a DATE column. */
+export function toDbDate(date: IsoDate): Date {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error(`Invalid date "${date}"`);
+  return new Date(`${date}T00:00:00.000Z`);
 }
 
 function parse(date: IsoDate): Date {

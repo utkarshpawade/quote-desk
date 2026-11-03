@@ -1,6 +1,9 @@
 import path from "node:path";
 import { defineConfig } from "vitest/config";
 
+// Business dates must not depend on the machine clock zone: Vercel runs in UTC, so tests do too.
+process.env.TZ = "UTC";
+
 const root = import.meta.dirname;
 
 export default defineConfig({

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { addWorkingDays, dueState, toIstDate, workingDaysBetween } from "./calendar";
+import {
+  addWorkingDays,
+  dueState,
+  fromDbDate,
+  toDbDate,
+  todayIst,
+  toIstDate,
+  workingDaysBetween,
+} from "./calendar";
 
 // 2026-11-01 is a Sunday; 2026-11-03 is a Tuesday.
 
@@ -27,5 +35,15 @@ describe("working days (Sundays off)", () => {
   it("uses the India calendar date", () => {
     expect(toIstDate(new Date("2026-11-02T19:00:00Z"))).toBe("2026-11-03");
     expect(toIstDate(new Date("2026-11-02T18:00:00Z"))).toBe("2026-11-02");
+  });
+
+  it("rolls the business day over at IST midnight, not UTC midnight", () => {
+    expect(todayIst(new Date("2026-11-30T18:29:00Z"))).toBe("2026-11-30");
+    expect(todayIst(new Date("2026-11-30T18:31:00Z"))).toBe("2026-12-01");
+  });
+
+  it("round-trips DATE columns without shifting a day", () => {
+    expect(fromDbDate(toDbDate("2026-11-03"))).toBe("2026-11-03");
+    expect(() => toDbDate("03/11/2026")).toThrow();
   });
 });
