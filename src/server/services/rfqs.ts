@@ -8,9 +8,11 @@ import { NotFoundError, UserError } from "@/server/errors";
 import { recordAudit } from "./audit";
 import { nextRfqNumber } from "./counters";
 import { assembleQuote, getSnapshotBody, type SnapshotBody } from "./quote-lifecycle";
-import { createDraftQuote } from "./quotes";
+import { createDraftQuote, previewReprice, type RepricePreview } from "./quotes";
 
 const OPEN: RfqStatus[] = ["ESTIMATING", "IN_APPROVAL", "APPROVED", "SENT"];
+/** Still with Company A — a sent quote waits on the customer and cannot be late. */
+const IN_HAND: RfqStatus[] = ["ESTIMATING", "IN_APPROVAL", "APPROVED"];
 const CLOSED: RfqStatus[] = ["WON", "LOST", "REGRETTED"];
 
 // ─── register ──────────────────────────────────────────────────────────────────
@@ -59,11 +61,11 @@ const returnedWhere: Prisma.RfqWhereInput = {
 };
 
 function chipWhere(chip: RegisterChip | undefined, today: IsoDate): Prisma.RfqWhereInput {
-  if (chip === "overdue") return { status: { in: OPEN }, dueDate: { lt: toDbDate(today) } };
+  if (chip === "overdue") return { status: { in: IN_HAND }, dueDate: { lt: toDbDate(today) } };
   if (chip === "due-soon") {
     // Due today or within the next 2 working days (Sundays skipped).
     const end = addWorkingDays(today, 2);
-    return { status: { in: ["ESTIMATING", "IN_APPROVAL", "APPROVED"] }, dueDate: { gte: toDbDate(today), lte: toDbDate(end) } };
+    return { status: { in: IN_HAND }, dueDate: { gte: toDbDate(today), lte: toDbDate(end) } };
   }
   if (chip === "returned") return returnedWhere;
   return {};
@@ -134,7 +136,7 @@ export async function listRegister(
       owner: r.owner,
       receivedAt: isoStr(r.receivedAt),
       dueDate,
-      due: OPEN.includes(r.status) && r.status !== "SENT" ? dueState(dueDate, today) : null,
+      due: IN_HAND.includes(r.status) ? dueState(dueDate, today) : null,
       status: r.status,
       statusLabel: RFQ_STATUS_LABEL[r.status],
       returned: r.status === "ESTIMATING" && quote?.status === "DRAFT" && Boolean(quote.decidedAt && quote.decisionNote),
@@ -142,6 +144,10 @@ export async function listRegister(
       quoteNumber: quote?.number ?? null,
     };
   });
+  // Work in hand first (soonest due), then quotes waiting on the customer.
+  if (filters.view === "mine" || filters.view === "open") {
+    rows.sort((a, b) => Number(a.status === "SENT") - Number(b.status === "SENT") || a.dueDate.localeCompare(b.dueDate));
+  }
   return { rows, chips: { overdue, "due-soon": dueSoon, returned } satisfies Record<RegisterChip, number> };
 }
 
@@ -225,11 +231,17 @@ export async function getWorkspace(db: DbOrTx, rfqId: string) {
   let body: SnapshotBody | null = null;
   let problems: Array<{ partId: string | null; message: string }> = [];
   let staleRates: Array<{ name: string; used: string | null; current: string | null }> = [];
+  let newerRates: RepricePreview | null = null;
   if (quote && quote.status === "DRAFT") {
     const assembled = await assembleQuote(db, quote.id, today);
     body = assembled.body;
     problems = assembled.problems;
     staleRates = assembled.staleRates;
+    // Rates that changed between the basis date and today (re-pricing would move the price).
+    if (dateStr(quote.basisDate) !== today) {
+      const preview = await previewReprice(db, quote.id, today);
+      if (preview.changedRates.length) newerRates = preview;
+    }
   } else if (quote) {
     body = (await getSnapshotBody(db, quote.id))?.body ?? null;
   }
@@ -263,12 +275,13 @@ export async function getWorkspace(db: DbOrTx, rfqId: string) {
     customer: { id: rfq.customer.id, name: rfq.customer.name, city: rfq.customer.city, segment: rfq.customer.segment, contactEmail: rfq.customer.contactEmail, aiAllowed: rfq.customer.aiAllowed, marginBasis: rfq.customer.marginBasis },
     receivedAt: isoStr(rfq.receivedAt),
     dueDate,
-    due: OPEN.includes(rfq.status) && rfq.status !== "SENT" ? dueState(dueDate, today) : null,
+    due: IN_HAND.includes(rfq.status) ? dueState(dueDate, today) : null,
     owner: rfq.owner,
     parts,
     approval: body?.approval ?? null,
     problems,
     staleRates,
+    newerRates,
     quote: quote
       ? {
           id: quote.id,
