@@ -2,8 +2,9 @@
 
 /*
  * Quote Desk design tokens.
- * Calm and precise: warm white canvas, white surfaces, hairline borders, three ink steps,
- * one steel-blue accent, muted status hues and a single violet reserved for AI-sourced values.
+ * Calm and precise: cool neutral canvas, white surfaces, hairline dividers, 3:1 control borders
+ * (WCAG 1.4.11), three ink steps, one steel-blue accent, red only for "act now", and a single
+ * violet reserved for values that are suggested and awaiting the estimator.
  */
 @theme {
   --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
@@ -22,46 +23,47 @@
   --text-title--line-height: 1.75rem;
 
   /* surfaces */
-  --color-canvas: #f7f7f5;
+  --color-canvas: #f6f7f9;
   --color-surface: #ffffff;
-  --color-subtle: #f3f3f0;
-  --color-hover: #efefeb;
-  --color-line: #e5e4e0;
-  --color-line-strong: #d2d1cb;
+  --color-subtle: #f3f5f7;
+  --color-hover: #eef1f4;
+  --color-line: #e3e6ea; /* dividers and card edges only */
+  --color-line-strong: #cfd4da;
+  --color-control: #8a939f; /* input borders: 3.1:1 on white */
 
   /* ink */
-  --color-ink: #191b1f;
-  --color-ink-2: #4a4f57;
-  --color-ink-3: #6b7079;
-  --color-ink-4: #9aa0a8;
+  --color-ink: #15191f; /* 17.6:1 */
+  --color-ink-2: #4a5260; /* 7.9:1 */
+  --color-ink-3: #646c7a; /* 5.3:1 — captions pass at 12 px */
+  --color-ink-4: #959caa; /* decorative / disabled only */
 
   /* accent */
-  --color-accent: #1f4e79;
-  --color-accent-hover: #183e61;
-  --color-accent-soft: #eaf0f6;
-  --color-accent-line: #c7d6e6;
+  --color-accent: #2b5b8a; /* 7.1:1, and white on it 7.1:1 */
+  --color-accent-hover: #234b72;
+  --color-accent-soft: #eef3f8; /* selected rows, base-volume column */
+  --color-accent-line: #c9d8e7;
 
-  /* AI-sourced values awaiting acceptance */
-  --color-ai: #6941c6;
-  --color-ai-soft: #f5f2fd;
-  --color-ai-line: #ddd3f6;
+  /* suggested values awaiting the estimator (rule + caption only, never fills or icons) */
+  --color-ai: #5b45b0;
+  --color-ai-soft: #f4f2fb;
+  --color-ai-line: #d9d2f0;
 
-  /* feedback */
-  --color-ok: #067647;
-  --color-ok-soft: #ecf6ef;
-  --color-warn: #b54708;
-  --color-warn-soft: #fdf4e9;
+  /* feedback — red means "act now" (blocking error, overdue) and nothing else */
+  --color-ok: #2e7d4f;
+  --color-ok-soft: #eef6f1;
+  --color-warn: #8a5a00;
+  --color-warn-soft: #fbf4e6;
   --color-danger: #b42318;
   --color-danger-soft: #fdeeed;
 
-  /* status dots */
-  --color-st-estimating: #5d6b82;
+  /* status dots (always paired with a word) */
+  --color-st-estimating: #6b7a90;
   --color-st-approval: #c27a12;
-  --color-st-approved: #0e7c66;
-  --color-st-sent: #1f4e79;
-  --color-st-won: #067647;
-  --color-st-lost: #b42318;
-  --color-st-muted: #9aa0a8;
+  --color-st-approved: #2b8a74;
+  --color-st-sent: #2b5b8a;
+  --color-st-won: #2e7d4f;
+  --color-st-lost: #959caa;
+  --color-st-muted: #b6bcc5;
 
   --radius-sm: 4px;
   --radius-md: 6px;
@@ -95,7 +97,14 @@
 
   :focus-visible {
     outline: 2px solid var(--color-accent);
-    outline-offset: 2px;
+    outline-offset: 1px;
+  }
+
+  /* Touch screens get 44 px targets. */
+  @media (pointer: coarse) {
+    .touch-target {
+      min-height: 44px;
+    }
   }
 
   ::selection {
