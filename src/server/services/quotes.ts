@@ -184,8 +184,8 @@ export function defaultDraft(args: {
   };
 }
 
-/** Writes a draft's lines, operations and tiers (used on create, save and re-price). */
-async function writeLine(
+/** Writes a draft's lines, operations and tiers (used on create, save, re-price and the seed). */
+export async function writeLine(
   tx: DbOrTx,
   lineId: string,
   draft: LineDraft,

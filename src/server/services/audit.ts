@@ -17,6 +17,8 @@ export async function recordAudit(
     /** One readable sentence for the timeline: "Approved QT-2611-019-R0 (₹2.66 Cr)". */
     summary: string;
     data?: Prisma.InputJsonValue;
+    /** Defaults to now; the seed passes historical times. */
+    at?: Date;
   },
 ): Promise<void> {
   await db.auditEvent.create({
@@ -29,6 +31,7 @@ export async function recordAudit(
       action: event.action,
       summary: event.summary,
       data: event.data,
+      ...(event.at ? { at: event.at } : {}),
     },
   });
 }

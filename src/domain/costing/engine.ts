@@ -233,6 +233,12 @@ export function computeCosting(raw: CostingInput, context: CostingContext = {}):
     return { op, cost, setupPerBatch };
   });
 
+  // A machined or forged part always has at least one operation; without it the price would
+  // be material only — a precise-looking wrong number.
+  if (input.operations.length === 0) {
+    err(issues, "ROUTING_EMPTY", "Add the routing — at least one operation.", "operations");
+  }
+
   // Commercials
   const rejection = num(input.rejectionPct);
   if (rejection === null || rejection.lt(REJECTION_RANGE[0]) || rejection.gt(REJECTION_RANGE[1])) {

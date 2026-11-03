@@ -154,6 +154,12 @@ describe("validation", () => {
     expect(codes(r)).toEqual(expect.arrayContaining(["MARGIN_OUT_OF_RANGE", "VOLUME_DUPLICATE"]));
   });
 
+  it("withholds the price until there is a routing", () => {
+    const r = computeCosting({ ...spindleFixture(), operations: [] });
+    expect(r.priceable).toBe(false);
+    expect(codes(r)).toContain("ROUTING_EMPTY");
+  });
+
   it("blocks an unbound operation and a machine operation without a cycle time", () => {
     const input = spindleFixture();
     input.operations[0] = { ...input.operations[0]!, rate: null };

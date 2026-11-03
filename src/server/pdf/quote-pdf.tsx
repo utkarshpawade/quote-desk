@@ -267,7 +267,7 @@ function QuotePdf({ doc }: { doc: QuoteDocument }) {
 
         <View wrap={false} style={{ marginTop: 16 }}>
           <Text style={s.h2}>Rate basis</Text>
-          <Text style={[s.muted, { marginBottom: 4 }]}>Every rate this quote was priced with, as recorded in Company A's rate masters.</Text>
+          <Text style={[s.muted, { marginBottom: 4 }]}>Every rate this quote was priced with, exactly as recorded in the rate masters.</Text>
           <View style={s.tableHead}>
             <Text style={[s.th, { width: "22%" }]}>Code</Text>
             <Text style={[s.th, { width: "44%" }]}>Rate</Text>

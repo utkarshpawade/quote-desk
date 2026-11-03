@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { todayIst, type IsoDate } from "@/domain/calendar";
+import { toIstDate, type IsoDate } from "@/domain/calendar";
 import { evaluateApproval, type ApprovalResult } from "@/domain/costing/approval";
 import { contextFromOptions, draftToCostingInput, type LineDraft } from "@/domain/costing/draft";
 import { computeCosting } from "@/domain/costing/engine";
@@ -261,8 +261,12 @@ async function transition(
 
 const inr = (v: string) => formatINR(v);
 
-export async function submitQuote(db: Db, user: { id: string; name: string }, quoteId: string) {
-  const today = todayIst();
+/** Optional clock: services default to now; the seed replays history at past times. */
+export type Clock = { now?: Date };
+
+export async function submitQuote(db: Db, user: { id: string; name: string }, quoteId: string, clock: Clock = {}) {
+  const now = clock.now ?? new Date();
+  const today = toIstDate(now);
   const { quote, body, problems, staleRates } = await assembleQuote(db, quoteId, today);
   if (quote.status !== "DRAFT") throw new UserError("Only a draft quote can be submitted.");
   if (staleRates.length) {
@@ -277,12 +281,11 @@ export async function submitQuote(db: Db, user: { id: string; name: string }, qu
   const hash = hashSnapshot(text);
   const { requiresApproval, approvalValue, threshold } = body.approval;
   const action: Action = requiresApproval ? "SUBMIT_FOR_APPROVAL" : "APPROVE_BY_RULE";
-  const now = new Date();
   const ruleNote = requiresApproval ? null : `Approved by rule: ${inr(approvalValue)} ≤ ${inr(threshold)}`;
 
   await db.$transaction(async (tx) => {
     const seq = (await tx.quoteSnapshot.count({ where: { quoteId } })) + 1;
-    await tx.quoteSnapshot.create({ data: { quoteId, seq, body: text, hash, engineVersion: body.engineVersion, createdById: user.id } });
+    await tx.quoteSnapshot.create({ data: { quoteId, seq, body: text, hash, engineVersion: body.engineVersion, createdById: user.id, createdAt: now } });
     for (const [key, ref] of [
       [COMMERCIAL.APPROVAL_THRESHOLD, body.policy.threshold],
       [COMMERCIAL.MARGIN_FLOOR_PCT, body.policy.marginFloor],
@@ -324,6 +327,7 @@ export async function submitQuote(db: Db, user: { id: string; name: string }, qu
         ? `${user.name} submitted ${quote.number} for approval (${inr(approvalValue)} > ${inr(threshold)})`
         : `${quote.number} approved by rule (${inr(approvalValue)} ≤ ${inr(threshold)}) — ready to send`,
       data: { snapshotSeq: seq, hash },
+      at: now,
     });
   });
   return { requiresApproval, approvalValue };
@@ -343,7 +347,13 @@ async function loadForDecision(db: DbOrTx, quoteId: string, snapshotId: string) 
   return quote;
 }
 
-export async function approveQuote(db: Db, user: { id: string; name: string }, args: { quoteId: string; snapshotId: string; note: string | null }) {
+export async function approveQuote(
+  db: Db,
+  user: { id: string; name: string },
+  args: { quoteId: string; snapshotId: string; note: string | null },
+  clock: Clock = {},
+) {
+  const now = clock.now ?? new Date();
   const quote = await loadForDecision(db, args.quoteId, args.snapshotId);
   await db.$transaction(async (tx) => {
     await transition(tx, {
@@ -352,7 +362,7 @@ export async function approveQuote(db: Db, user: { id: string; name: string }, a
       action: "APPROVE",
       quote,
       rfqStatus: quote.rfq.status,
-      quoteData: { decidedById: user.id, decidedAt: new Date(), decisionNote: args.note?.trim() || null },
+      quoteData: { decidedById: user.id, decidedAt: now, decisionNote: args.note?.trim() || null },
     });
     await recordAudit(tx, {
       actorId: user.id,
@@ -363,6 +373,7 @@ export async function approveQuote(db: Db, user: { id: string; name: string }, a
       action: "quote.approved",
       summary: `${user.name} approved ${quote.number}${args.note?.trim() ? ` — “${args.note.trim()}”` : ""}`,
       data: { snapshotId: args.snapshotId },
+      at: now,
     });
   });
 }
@@ -371,7 +382,9 @@ export async function returnQuote(
   db: Db,
   user: { id: string; name: string },
   args: { quoteId: string; snapshotId: string; note: string; partIds: string[] },
+  clock: Clock = {},
 ) {
+  const now = clock.now ?? new Date();
   const note = args.note.trim();
   if (note.length < 5) throw new UserError("Say what needs to change — the estimator sees this note.", { note: "Required" });
   const quote = await loadForDecision(db, args.quoteId, args.snapshotId);
@@ -382,7 +395,7 @@ export async function returnQuote(
       action: "RETURN",
       quote,
       rfqStatus: quote.rfq.status,
-      quoteData: { decidedById: user.id, decidedAt: new Date(), decisionNote: note, returnedPartIds: args.partIds },
+      quoteData: { decidedById: user.id, decidedAt: now, decisionNote: note, returnedPartIds: args.partIds },
     });
     await recordAudit(tx, {
       actorId: user.id,
@@ -393,6 +406,7 @@ export async function returnQuote(
       action: "quote.returned",
       summary: `${user.name} returned ${quote.number} — “${note}”`,
       data: { snapshotId: args.snapshotId, partIds: args.partIds },
+      at: now,
     });
   });
 }
@@ -414,6 +428,7 @@ export async function sendQuote(
   user: { id: string; name: string },
   args: { quoteId: string; to: string; cc: string | null; subject: string; message: string },
   renderPdf: (quoteId: string) => Promise<Buffer>,
+  clock: Clock = {},
 ) {
   const quote = await db.quote.findUnique({ where: { id: args.quoteId }, include: { rfq: { select: { status: true, number: true } } } });
   if (!quote) throw new NotFoundError("Quote");
@@ -423,7 +438,7 @@ export async function sendQuote(
 
   const pdf = await renderPdf(quote.id);
   const sha256 = createHash("sha256").update(pdf).digest("hex");
-  const now = new Date();
+  const now = clock.now ?? new Date();
 
   await db.$transaction(async (tx) => {
     const file = await tx.storedFile.create({
@@ -436,11 +451,12 @@ export async function sendQuote(
         sha256,
         data: new Uint8Array(pdf),
         uploadedById: user.id,
+        createdAt: now,
       },
       select: { id: true },
     });
     await tx.outboxMessage.create({
-      data: { quoteId: quote.id, to: args.to, cc: args.cc, subject: args.subject, body: args.message, pdfFileId: file.id, createdById: user.id },
+      data: { quoteId: quote.id, to: args.to, cc: args.cc, subject: args.subject, body: args.message, pdfFileId: file.id, createdById: user.id, createdAt: now },
     });
     await transition(tx, {
       quoteId: quote.id,
@@ -495,12 +511,14 @@ export async function sendQuote(
       action: "quote.sent",
       summary: `${user.name} sent ${quote.number} to ${args.to} (mock email, PDF stored)`,
       data: { fileId: file.id, sha256 },
+      at: now,
     });
   });
 }
 
 /** Re-opens a sent RFQ with a new draft revision copied from the sent one (re-priced on today). */
-export async function reviseRfq(db: Db, user: { id: string; name: string }, rfqId: string) {
+export async function reviseRfq(db: Db, user: { id: string; name: string }, rfqId: string, clock: Clock = {}) {
+  const now = clock.now ?? new Date();
   const rfq = await db.rfq.findUnique({ where: { id: rfqId }, include: { quotes: { orderBy: { revision: "desc" }, take: 1 } } });
   if (!rfq) throw new NotFoundError("RFQ");
   const latest = rfq.quotes[0];
@@ -510,7 +528,7 @@ export async function reviseRfq(db: Db, user: { id: string; name: string }, rfqI
     if (r.count !== 1) throw new ConflictError();
     const revision = latest.revision + 1;
     const number = formatQuoteNumber(rfq.number, revision);
-    await createDraftQuote(tx, { rfqId, revision, number, basisDate: todayIst(), copyFrom: latest.id });
+    await createDraftQuote(tx, { rfqId, revision, number, basisDate: toIstDate(now), copyFrom: latest.id });
     await recordAudit(tx, {
       actorId: user.id,
       rfqId,
@@ -518,6 +536,7 @@ export async function reviseRfq(db: Db, user: { id: string; name: string }, rfqI
       entityId: rfqId,
       action: "quote.revised",
       summary: `${user.name} started revision ${number} from ${latest.number}`,
+      at: now,
     });
   });
 }
@@ -526,7 +545,9 @@ export async function closeRfq(
   db: Db,
   user: { id: string; name: string },
   args: { rfqId: string; outcome: "WON" | "LOST" | "REGRETTED"; reason: CloseReason | null; note: string | null },
+  clock: Clock = {},
 ) {
+  const now = clock.now ?? new Date();
   const rfq = await db.rfq.findUnique({ where: { id: args.rfqId } });
   if (!rfq) throw new NotFoundError("RFQ");
   const action: Action = args.outcome === "WON" ? "MARK_WON" : args.outcome === "LOST" ? "MARK_LOST" : "REGRET";
@@ -537,7 +558,7 @@ export async function closeRfq(
   await db.$transaction(async (tx) => {
     const r = await tx.rfq.updateMany({
       where: { id: rfq.id, status: rfq.status },
-      data: { status: next, closeReason: args.outcome === "WON" ? null : args.reason, closeNote: args.note?.trim() || null, closedAt: new Date() },
+      data: { status: next, closeReason: args.outcome === "WON" ? null : args.reason, closeNote: args.note?.trim() || null, closedAt: now },
     });
     if (r.count !== 1) throw new ConflictError();
     await tx.pastQuote.updateMany({
@@ -552,6 +573,7 @@ export async function closeRfq(
       action: `rfq.${args.outcome.toLowerCase()}`,
       summary: `${user.name} marked ${rfq.number} ${args.outcome.toLowerCase()}${args.reason ? ` (${args.reason.toLowerCase().replace(/_/g, " ")})` : ""}`,
       data: { note: args.note },
+      at: now,
     });
   });
 }
