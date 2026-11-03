@@ -102,7 +102,10 @@ function rateBasis(body: SnapshotBody): QuoteDocument["rateBasis"] {
     i.bop.forEach((b) => add(b.rate));
     i.operations.forEach((o) => add(o.rate));
   }
-  [body.params.overheadPct, body.params.iccRatePct, body.params.iccDays, body.policy.gst18, body.policy.gst5].forEach(add);
+  [body.params.overheadPct, body.params.iccRatePct, body.params.iccDays].forEach(add);
+  // Only the GST classes the quote actually uses.
+  if (body.lines.some((l) => l.gstClass === "GST_18")) add(body.policy.gst18);
+  if (body.lines.some((l) => l.gstClass === "GST_5")) add(body.policy.gst5);
   return [...seen.values()].map((ref) => ({
     code: ref.code,
     name: ref.name,

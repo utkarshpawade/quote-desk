@@ -29,6 +29,16 @@ const SHOTS: Shot[] = [
   { name: "register-sales-head", user: SALES_HEAD, go: async (p) => void (await p.goto(`${BASE}/rfqs`)) },
   { name: "workspace-019", user: SALES_HEAD, go: (p) => openRfq(p, "RFQ-2611-019"), fullPage: true },
   {
+    name: "quote-019",
+    user: SALES_HEAD,
+    go: async (p) => {
+      await openRfq(p, "RFQ-2611-019");
+      await p.getByRole("link", { name: "Review & approve" }).click();
+      await p.waitForURL(/\/quotes\//);
+    },
+    fullPage: true,
+  },
+  {
     name: "costing-014",
     user: ESTIMATOR,
     go: async (p) => {
