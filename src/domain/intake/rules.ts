@@ -16,7 +16,7 @@ const EMAIL_RULES: Rule[] = [
   { fieldKey: "customerRef", re: /\b(?:RFQ|Enquiry|Inquiry|Our ref(?:erence)?|Ref(?:erence)?)\s*(?:No\.?|Number|#)?\s*[:\-]?\s*([A-Z0-9][A-Z0-9/\-_.]{3,})/i, level: "rfq" },
   { fieldKey: "dueDate", re: new RegExp(String.raw`\b(?:due(?: date)?|last date|on or before|before|latest by|submit(?:ted)?(?: your (?:quote|offer))?(?: by| before)?|quote by)\s*(?:on)?\s*[:\-]?\s*${DATE}`, "i"), level: "rfq" },
   { fieldKey: "annualVolume", re: new RegExp(String.raw`\b(?:annual (?:volume|requirement|qty|quantity)|EAU|estimated annual usage|volume|requirement|monthly (?:schedule|requirement))\s*(?:of|is|:|-)?\s*${NUMBER}`, "i"), level: "part" },
-  { fieldKey: "material", re: /\b(?:Material|Matl\.?|Grade)\s*[:\-]\s*([A-Za-z0-9][A-Za-z0-9 \-/.]{1,40}?)(?:\s+as per|\s*$|[,;])/i, level: "part" },
+  { fieldKey: "material", re: /\b(?:Material|Matl\.?|Grade)\s*[:\-]\s*([A-Za-z0-9][A-Za-z0-9 \-/.]{1,40}?)(?:\s+as per|\s*\(|\s*$|[,;])/i, level: "part" },
   { fieldKey: "partNo", re: /\b(?:Part|Item)\s*(?:No\.?|Number|#)\s*[:\-]?\s*([A-Z0-9][A-Z0-9\-/.]{3,})/i, level: "part" },
   { fieldKey: "drawingNo", re: /\b(?:Drg\.?|Drawing)\s*(?:No\.?|Number|#)\s*[:\-]?\s*([A-Z0-9][A-Z0-9\-/.]{3,})/i, level: "part" },
   { fieldKey: "grossWeightKg", re: new RegExp(String.raw`\b(?:gross|input|forging|cut)\s*(?:wt\.?|weight)\s*[:\-]?\s*${WEIGHT}`, "i"), level: "part" },
@@ -52,7 +52,8 @@ export function readByRules(text: string, kind: "EMAIL" | "TITLE_BLOCK"): RawVal
       seen.add(rule.fieldKey);
       out.push({
         fieldKey: rule.fieldKey,
-        raw: m[1].trim(),
+        // "E/KIT/26/0412." at the end of a sentence: the full stop is not part of the value.
+        raw: m[1].trim().replace(/[.,;:]+$/, ""),
         evidence: line.trim(),
         locator: kind === "EMAIL" ? `line ${index + 1}` : "title block",
         part: rule.level === "part" ? { partNo: PART_NO_IN_LINE.exec(line)?.[1] ?? null } : undefined,

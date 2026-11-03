@@ -52,7 +52,8 @@ function comparable(fieldKey: string, value: string): string {
   return normalizeText(value).replace(/\s/g, "");
 }
 
-const partNoKey = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+/** Part numbers compare without case, spaces or punctuation: "CB RWS 0612" = "CB-RWS-0612". */
+export const partNoKey = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
 /** Part key for values that could not be tied to a part. */
 export const UNMATCHED = "UNMATCHED";

@@ -22,6 +22,7 @@
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset --force && prisma db seed",
     "sample-data": "tsx --env-file-if-exists=.env scripts/generate-sample-data.ts",
+    "eval:intake": "tsx --env-file-if-exists=.env scripts/eval-intake.ts",
     "format": "prettier --write .",
     "postinstall": "prisma generate"
   },
