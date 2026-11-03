@@ -19,7 +19,7 @@ async function main() {
   const started = Date.now();
   const summary = await seedDemo(db, { password: process.env.SEED_DEMO_PASSWORD || DEFAULT_DEMO_PASSWORD });
   console.log(
-    `Seeded ${summary.rfqs} RFQs (${summary.frozenQuotes} submitted), ${summary.pastQuotes.toLocaleString("en-IN")} past quotes, ${summary.rateItems} rate items, ${summary.users} users in ${((Date.now() - started) / 1000).toFixed(1)} s.`,
+    `Seeded ${summary.rfqs} RFQs (${summary.frozenQuotes} submitted), ${summary.pastQuotes.toLocaleString("en-IN")} past quotes, ${summary.intakes} intakes, ${summary.rateItems} rate items, ${summary.users} users in ${((Date.now() - started) / 1000).toFixed(1)} s.`,
   );
 }
 

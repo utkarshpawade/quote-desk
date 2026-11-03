@@ -18,10 +18,12 @@ export type ShellCounts = { approvals: number; readyToSend: number; pendingIntak
 export function AppShell({
   user,
   counts,
+  canResetDemo = false,
   children,
 }: {
   user: CurrentUser;
   counts: ShellCounts;
+  canResetDemo?: boolean;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -34,7 +36,7 @@ export function AppShell({
           <Wordmark className="hidden 2xl:flex" />
         </div>
         <NavList user={user} counts={counts} rail />
-        <UserBlock user={user} rail />
+        <UserBlock user={user} canResetDemo={canResetDemo} rail />
       </aside>
 
       <header className="sticky top-0 z-30 flex h-12 items-center justify-between border-b border-line bg-surface/95 px-4 backdrop-blur lg:hidden">
@@ -67,7 +69,7 @@ export function AppShell({
               </div>
               <Dialog.Description className="sr-only">Main navigation</Dialog.Description>
               <NavList user={user} counts={counts} onNavigate={() => setOpen(false)} />
-              <UserBlock user={user} />
+              <UserBlock user={user} canResetDemo={canResetDemo} />
             </Dialog.Content>
           </Dialog.Portal>
         </Dialog.Root>

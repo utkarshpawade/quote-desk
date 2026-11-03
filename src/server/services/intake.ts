@@ -306,6 +306,27 @@ export async function extractSource(db: Db, user: User, sourceId: string): Promi
   }
 }
 
+/** Intakes read and waiting for an estimator's decisions (shown on the register). */
+export async function listPendingIntakes(db: DbOrTx) {
+  const sessions = await db.intakeSession.findMany({
+    where: { status: "REVIEW" },
+    orderBy: { createdAt: "asc" },
+    take: 5,
+    include: {
+      createdBy: { select: { name: true } },
+      sources: { select: { label: true }, orderBy: { createdAt: "asc" }, take: 1 },
+      _count: { select: { fields: { where: { status: "PENDING" } } } },
+    },
+  });
+  return sessions.map((s) => ({
+    id: s.id,
+    label: (s.sources[0]?.label ?? "Untitled intake").replace(/^Email: /, ""),
+    createdBy: s.createdBy.name,
+    createdAt: isoStr(s.createdAt),
+    pending: s._count.fields,
+  }));
+}
+
 /** The session is ready for review once no source is still being read. */
 async function settleSession(db: DbOrTx, sessionId: string) {
   const busy = await db.intakeSource.count({ where: { sessionId, status: { in: ["PENDING", "PROCESSING"] } } });

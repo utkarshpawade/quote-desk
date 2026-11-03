@@ -5,6 +5,8 @@ import type { CloseReason } from "@/domain/status";
 import type { Db } from "@/server/db-client";
 import { hashPassword } from "@/server/auth/password";
 import { raiseSequence } from "@/server/services/counters";
+import { startSampleIntake } from "@/server/intake/samples";
+import { extractSource } from "@/server/services/intake";
 import { importPastQuotes, readSampleImport } from "@/server/services/past-quote-import";
 import { closeRfq, approveQuote, getSnapshotBody, returnQuote, sendQuote, submitQuote } from "@/server/services/quote-lifecycle";
 import { renderQuotePdfFor } from "@/server/services/quote-pdf";
@@ -275,6 +277,7 @@ export interface SeedSummary {
   users: number;
   rateItems: number;
   pastQuotes: number;
+  intakes: number;
   rfqs: number;
   frozenQuotes: number;
 }
@@ -457,10 +460,24 @@ export async function seedDemo(db: Db, options: { password: string; keepUsers?: 
   // 7. Move every RFQ counter past the numbers the seed used.
   for (const [period, seq] of sequences) await raiseSequence(db, `RFQ-${period}`, seq);
 
+  // 8. Two incoming RFQs read and waiting for review (packs E and F; D became RFQ-2611-023).
+  //    Read by the AI when a key is configured (results are cached), by rules otherwise.
+  const intakes = [
+    ["company-e-brake-hub", estimators[0]!],
+    ["company-f-yoke", estimators[1]!],
+  ] as const;
+  for (const [pack, user] of intakes) {
+    const sessionId = await startSampleIntake(db, user, pack);
+    for (const source of await db.intakeSource.findMany({ where: { sessionId, status: "PENDING" }, select: { id: true } })) {
+      await extractSource(db, user, source.id);
+    }
+  }
+
   return {
     users: estimators.length + 1,
     rateItems: SEED_ITEMS.length,
     pastQuotes: imported.imported,
+    intakes: intakes.length,
     rfqs: specs.length,
     frozenQuotes: frozen,
   };

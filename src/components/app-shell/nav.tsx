@@ -16,6 +16,7 @@ import { cn } from "@/lib/cn";
 import { logout } from "@/server/auth/actions";
 import type { CurrentUser } from "@/server/auth/session";
 import type { ShellCounts } from "./app-shell";
+import { DemoResetButton } from "./demo-reset";
 
 type Item = {
   href: string;
@@ -147,7 +148,7 @@ export function initials(name: string) {
     .toUpperCase();
 }
 
-export function UserBlock({ user, rail = false }: { user: CurrentUser; rail?: boolean }) {
+export function UserBlock({ user, canResetDemo = false, rail = false }: { user: CurrentUser; canResetDemo?: boolean; rail?: boolean }) {
   return (
     <div
       className={cn(
@@ -166,6 +167,7 @@ export function UserBlock({ user, rail = false }: { user: CurrentUser; rail?: bo
         <p className="truncate text-dense font-medium">{user.name}</p>
         <p className="truncate text-xs text-ink-3">{ROLE_LABEL[user.role]}</p>
       </div>
+      {canResetDemo ? <DemoResetButton /> : null}
       <form action={logout}>
         <button
           type="submit"

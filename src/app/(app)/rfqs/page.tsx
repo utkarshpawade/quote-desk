@@ -1,4 +1,4 @@
-import { Inbox, Plus } from "lucide-react";
+import { FileInput, Inbox, Plus } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DueLabel, RfqStatusLabel } from "@/components/rfq/labels";
@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Page, PageHeader } from "@/components/ui/page";
 import { EmptyState } from "@/components/ui/states";
 import { Table, TableScroll, Td, Th, Tr } from "@/components/ui/table";
-import { formatDate, formatINRCompact } from "@/lib/format";
+import { formatDate, formatDateTime, formatINRCompact } from "@/lib/format";
 import { requireUser } from "@/server/auth/session";
 import { db } from "@/server/db";
+import { listPendingIntakes } from "@/server/services/intake";
 import { listCustomers, listEstimators, listRegister, registerViewCounts, salesHeadKpis, type RegisterChip, type RegisterView } from "@/server/services/rfqs";
 import { RegisterToolbar } from "./register-toolbar";
 
@@ -39,11 +40,12 @@ export default async function RegisterPage({
   const view = (VIEWS.some((v) => v.key === params.view) ? params.view : defaultView) as RegisterView;
   const chip = CHIPS.includes(params.chip as RegisterChip) ? (params.chip as RegisterChip) : undefined;
 
-  const [{ rows, chips }, estimators, customers, kpis] = await Promise.all([
+  const [{ rows, chips }, estimators, customers, kpis, intakes] = await Promise.all([
     listRegister(db, user, { view, chip, q: params.q, ownerId: params.owner, customerId: params.customer }),
     listEstimators(db),
     listCustomers(db),
     user.role === "SALES_HEAD" ? salesHeadKpis(db) : null,
+    listPendingIntakes(db),
   ]);
 
   const filtered = Boolean(params.q || params.owner || params.customer || chip);
@@ -104,6 +106,27 @@ export default async function RegisterPage({
           })}
         </ul>
       </nav>
+
+      {intakes.length ? (
+        <section aria-label="Incoming RFQs waiting for review" className="mb-4 rounded-lg border border-ai-line bg-ai-soft/60 px-4 py-2.5">
+          <p className="flex items-center gap-2 text-dense font-medium">
+            <FileInput className="size-4 text-ai" aria-hidden />
+            {intakes.length === 1 ? "1 incoming RFQ is" : `${intakes.length} incoming RFQs are`} waiting for review
+          </p>
+          <ul className="mt-1.5 flex flex-col gap-1 text-dense">
+            {intakes.map((i) => (
+              <li key={i.id} className="flex flex-wrap items-baseline gap-x-2">
+                <Link href={`/intake/${i.id}`} className="font-medium text-accent hover:underline underline-offset-2">
+                  {i.label}
+                </Link>
+                <span className="text-xs text-ink-3">
+                  {i.createdBy} · {formatDateTime(i.createdAt)} · {i.pending} value{i.pending === 1 ? "" : "s"} to decide
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <RegisterToolbar
         view={view}
