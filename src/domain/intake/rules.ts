@@ -60,5 +60,10 @@ export function readByRules(text: string, kind: "EMAIL" | "TITLE_BLOCK"): RawVal
       });
     }
   });
+  // A title block describes exactly one part: every value belongs to the part number it names.
+  if (kind === "TITLE_BLOCK") {
+    const partNo = out.find((v) => v.fieldKey === "partNo")?.raw ?? null;
+    if (partNo) for (const v of out) if (v.part) v.part = { partNo };
+  }
   return out;
 }

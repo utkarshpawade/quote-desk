@@ -131,6 +131,15 @@ describe("merging sources", () => {
     ]);
     expect(new Set(proposals.map((p) => p.partKey))).toEqual(new Set(["CBRWS0612"]));
   });
+
+  it("joins it the same way when the drawing is read before the part list", () => {
+    const proposals = mergeCandidates([
+      base({ fieldKey: "material", value: "EN8", display: "EN8", sourceId: "drawing", part: { description: "REAR WHEEL SPINDLE" } }),
+      base({ fieldKey: "description", value: "Rear wheel spindle", display: "Rear wheel spindle" }),
+      base({ fieldKey: "partNo", value: "CB-RWS-0612", display: "CB-RWS-0612" }),
+    ]);
+    expect(new Set(proposals.map((p) => p.partKey))).toEqual(new Set(["CBRWS0612"]));
+  });
 });
 
 describe("rule-based fallback", () => {
@@ -182,6 +191,11 @@ describe("rule-based fallback", () => {
   it("reads a title block", () => {
     const read = Object.fromEntries(readByRules("PART NAME GEAR BLANK\nPART NO DRV-GB-2207  REV C\nMATERIAL 20MnCr5\nWEIGHT 1.12 KG", "TITLE_BLOCK").map((r) => [r.fieldKey, r.raw]));
     expect(read).toMatchObject({ description: "GEAR BLANK", partNo: "DRV-GB-2207", drawingRev: "C", material: "20MnCr5", netWeightKg: "1.12 KG" });
+  });
+
+  it("puts every title-block value on the one part the block names", () => {
+    const read = readByRules("PART NAME: GEAR BLANK\nPART NO: DRV-GB-2207\nMATERIAL: 20MnCr5\nWEIGHT: 1.12 KG", "TITLE_BLOCK");
+    expect(read.filter((r) => r.part).map((r) => r.part!.partNo)).toEqual(["DRV-GB-2207", "DRV-GB-2207", "DRV-GB-2207", "DRV-GB-2207"]);
   });
 });
 

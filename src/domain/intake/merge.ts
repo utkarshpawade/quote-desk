@@ -73,9 +73,14 @@ export function assignParts(candidates: Candidate[]): Array<Candidate & { partKe
   }
   const keyForGroup = new Map<string, string>();
   const anonymous: string[] = [];
-  for (const [groupKey, list] of groups) {
-    const partNo = list.find((c) => c.fieldKey === "partNo")?.value ?? list.find((c) => c.part?.partNo)?.part?.partNo ?? null;
-    const description = list.find((c) => c.fieldKey === "description")?.value ?? list.find((c) => c.part?.description)?.part?.description ?? null;
+  const identify = (list: Candidate[]) => ({
+    partNo: list.find((c) => c.fieldKey === "partNo")?.value ?? list.find((c) => c.part?.partNo)?.part?.partNo ?? null,
+    description: list.find((c) => c.fieldKey === "description")?.value ?? list.find((c) => c.part?.description)?.part?.description ?? null,
+  });
+  // Groups that name a part number go first, whatever order the sources arrived in, so a
+  // description-only group (a title block without a part no.) can join the part it describes.
+  const ordered = [...groups].map(([groupKey, list]) => ({ groupKey, ...identify(list) })).sort((a, b) => Number(!a.partNo) - Number(!b.partNo));
+  for (const { groupKey, partNo, description } of ordered) {
     if (!partNo && !description) {
       anonymous.push(groupKey);
       continue;
@@ -108,10 +113,13 @@ export function mergeCandidates(input: Candidate[]): Proposal[] {
     const key = `${c.partKey}::${c.fieldKey}`;
     byField.set(key, [...(byField.get(key) ?? []), c]);
   }
-  const labels = new Map<string, string>();
+  // Each part is headed by its most confident description ("Gear blank" from the cell rather
+  // than "GEAR BLANK" read from the title block).
+  const labels = new Map<string, { value: string; rank: number }>();
   for (const c of assigned) {
-    if (!c.partKey) continue;
-    if (c.fieldKey === "description" && c.grounded) labels.set(c.partKey, c.value);
+    if (!c.partKey || c.fieldKey !== "description" || !c.grounded) continue;
+    const current = labels.get(c.partKey);
+    if (!current || RANK[c.confidence] > current.rank) labels.set(c.partKey, { value: c.value, rank: RANK[c.confidence] });
   }
 
   const proposals: Proposal[] = [];
@@ -124,7 +132,7 @@ export function mergeCandidates(input: Candidate[]): Proposal[] {
       distinct.set(k, [...(distinct.get(k) ?? []), c]);
     }
     const sorted = [...list].sort((a, b) => RANK[b.confidence] - RANK[a.confidence]);
-    const partLabel = !partKey ? null : partKey === UNMATCHED ? "Values not matched to a part" : (labels.get(partKey) ?? partKey);
+    const partLabel = !partKey ? null : partKey === UNMATCHED ? "Values not matched to a part" : (labels.get(partKey)?.value ?? partKey);
     const base = { partKey, partLabel, fieldKey, candidates: sorted, sortOrder: fieldOrder(fieldKey) };
 
     if (distinct.size > 1) {
