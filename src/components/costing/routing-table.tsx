@@ -140,9 +140,9 @@ export function RoutingTable(props: {
                       <span className="block py-1.5">{op.name}</span>
                     )}
                     {from || op.legacyName ? (
-                      <span className="mt-0.5 block truncate text-xs text-ai">
+                      <span className={cn("mt-0.5 block truncate text-xs", suggested ? "text-ai" : "text-ink-3")}>
                         {from ? `from ${from}` : ""}
-                        {op.legacyName && !op.itemId ? ` · was “${op.legacyName}” — choose a work centre` : ""}
+                        {op.legacyName && !op.itemId ? `${from ? " · " : ""}was “${op.legacyName}” — choose a work centre` : ""}
                       </span>
                     ) : null}
                   </td>
@@ -237,6 +237,7 @@ export function RoutingTable(props: {
       <ul className="flex flex-col gap-2 md:hidden">
         {operations.map((op, i) => {
           const result = props.results.find((r) => r.id === op.id);
+          const from = props.suggestedFromLabel(op.suggestedFromId);
           return (
             <li key={op.id} className={cn("rounded-md border border-line p-2.5", !op.confirmed && "border-l-2 border-l-ai")}>
               <div className="flex items-baseline justify-between gap-2">
@@ -245,6 +246,12 @@ export function RoutingTable(props: {
                 </span>
                 <span className="num font-medium">{result?.costPerPiece ? `₹${formatNumber(result.costPerPiece, 2)}` : "—"}</span>
               </div>
+              {from || (op.legacyName && !op.itemId) ? (
+                <p className={cn("mt-0.5 text-xs", op.confirmed ? "text-ink-3" : "text-ai")}>
+                  {from ? `from ${from}` : ""}
+                  {op.legacyName && !op.itemId ? `${from ? " · " : ""}was “${op.legacyName}” — choose a work centre` : ""}
+                </p>
+              ) : null}
               {editable ? (
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <div className="col-span-2">

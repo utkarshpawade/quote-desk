@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@react-pdf/renderer", "xlsx", "unpdf"],
   // Read from disk at runtime (PDF fonts, sample RFQ packs, the demo seed's register): ship them on Vercel.
   outputFileTracingIncludes: {
-    "/**": ["./src/server/pdf/fonts/**/*", "./sample-data/rfq-packs/**/*", "./sample-data/past-quotes-2023-2026.xlsx"],
+    "/**": ["./src/server/pdf/fonts/**/*", "./sample-data/rfq-packs/**/*", "./sample-data/past-quotes-2023-2026.xlsx", "./sample-data/past-quotes-with-errors.xlsx"],
   },
   poweredByHeader: false,
   async headers() {

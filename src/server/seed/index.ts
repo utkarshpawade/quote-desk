@@ -5,6 +5,7 @@ import type { CloseReason } from "@/domain/status";
 import type { Db } from "@/server/db-client";
 import { hashPassword } from "@/server/auth/password";
 import { raiseSequence } from "@/server/services/counters";
+import { importPastQuotes, readSampleImport } from "@/server/services/past-quote-import";
 import { closeRfq, approveQuote, getSnapshotBody, returnQuote, sendQuote, submitQuote } from "@/server/services/quote-lifecycle";
 import { renderQuotePdfFor } from "@/server/services/quote-pdf";
 import { basisParams, defaultDraft, newRowId, optionsAt, writeLine } from "@/server/services/quotes";
@@ -273,6 +274,7 @@ function earlier(a: Date, b: Date): Date {
 export interface SeedSummary {
   users: number;
   rateItems: number;
+  pastQuotes: number;
   rfqs: number;
   frozenQuotes: number;
 }
@@ -346,7 +348,11 @@ export async function seedDemo(db: Db, options: { password: string; keepUsers?: 
     customers.set(c.key, row.id);
   }
 
-  // 5. RFQs, replayed through the real services
+  // 5. The legacy quote register, through the same import as the Import screen (a month ago).
+  const register = await readSampleImport("register");
+  const imported = await importPastQuotes(db, salesHead, register, { now: workingDaysAgo(today, 26, 15) });
+
+  // 6. RFQs, replayed through the real services
   const specs = scenario().sort((a, b) => b.received - a.received);
   const sequences = new Map<string, number>();
   const reserved = new Set(specs.map((s) => s.number).filter(Boolean));
@@ -448,12 +454,13 @@ export async function seedDemo(db: Db, options: { password: string; keepUsers?: 
     if (spec.stage !== "SENT") await close(new Date(sentAt.getTime() + (spec.closeAfterDays ?? 10) * 86_400_000));
   }
 
-  // 6. Move every RFQ counter past the numbers the seed used.
+  // 7. Move every RFQ counter past the numbers the seed used.
   for (const [period, seq] of sequences) await raiseSequence(db, `RFQ-${period}`, seq);
 
   return {
     users: estimators.length + 1,
     rateItems: SEED_ITEMS.length,
+    pastQuotes: imported.imported,
     rfqs: specs.length,
     frozenQuotes: frozen,
   };

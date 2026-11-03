@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
+import Link from "next/link";
 import { breakupRows } from "@/domain/costing/labels";
 import type { CostingResult } from "@/domain/costing/types";
 import type { TierDraft } from "@/domain/costing/draft";
@@ -23,6 +24,8 @@ export function BreakupPanel(props: {
   onMargin: (index: number, value: string) => void;
   onAddTier: () => void;
   onRemoveTier: (index: number) => void;
+  /** Similar past parts: how many, and the median conversion ₹/kg of those with weights. */
+  similar?: { count: number; href: string; medianConversionPerKg: string | null } | null;
 }) {
   const { tiers, result, editable } = props;
   const rows = breakupRows(result);
@@ -151,6 +154,35 @@ export function BreakupPanel(props: {
         </tfoot>
       </table>
       {base < 0 && tiers.length ? <p className="border-t border-line px-3 py-2 text-xs text-danger">One volume must be the RFQ volume.</p> : null}
+      {props.similar ? <SimilarLine similar={props.similar} conversion={base >= 0 ? (result.tiers[base]?.lines?.conversionPerKg ?? null) : null} /> : null}
     </div>
+  );
+}
+
+function SimilarLine({ similar, conversion }: { similar: { count: number; href: string; medianConversionPerKg: string | null }; conversion: string | null }) {
+  const median = similar.medianConversionPerKg ? Number(similar.medianConversionPerKg) : null;
+  const gap = median && conversion ? Math.round(((Number(conversion) - median) / median) * 100) : null;
+  return (
+    <p className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-line px-3 py-2 text-xs text-ink-3">
+      <span>
+        {median !== null ? (
+          <>
+            Similar past parts: conversion median <span className="num text-ink-2">₹{formatNumber(median, 2)}/kg</span>
+            {gap !== null ? (
+              <span className={cn(Math.abs(gap) > 25 ? "text-warn" : "text-ink-2")}>
+                {" "}
+                · this part {gap >= 0 ? "+" : "−"}
+                {Math.abs(gap)} %
+              </span>
+            ) : null}
+          </>
+        ) : (
+          `${similar.count} similar past part${similar.count === 1 ? "" : "s"}`
+        )}
+      </span>
+      <Link href={similar.href} className="text-accent hover:underline">
+        See {similar.count} similar
+      </Link>
+    </p>
   );
 }

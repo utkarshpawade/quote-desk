@@ -2,6 +2,7 @@ import { CostingEditor } from "@/components/costing/costing-editor";
 import { can } from "@/domain/permissions";
 import { requireUser } from "@/server/auth/session";
 import { db } from "@/server/db";
+import { similarForCosting } from "@/server/services/past-quotes";
 import { getCostingView } from "@/server/services/quotes";
 import { loadWorkspace } from "../../data";
 
@@ -10,6 +11,11 @@ export default async function PartCostingPage({ params }: { params: Promise<{ rf
   const { rfqId, partId } = await params;
   const ws = await loadWorkspace(rfqId);
   const view = await getCostingView(db, rfqId, partId);
+  const similar = await similarForCosting(
+    db,
+    partId,
+    view.line.draft.operations.flatMap((o) => (o.suggestedFromId ? [o.suggestedFromId] : [])),
+  );
   const index = ws.parts.findIndex((p) => p.id === partId);
   const link = (i: number) => {
     const p = ws.parts[i];
@@ -20,6 +26,7 @@ export default async function PartCostingPage({ params }: { params: Promise<{ rf
     <CostingEditor
       key={`${view.line.id}-${view.quote.basisDate}`}
       view={view}
+      similar={similar}
       editable={view.quote.editable && can(user.role, "costing.edit")}
       rfqHref={`/rfqs/${rfqId}`}
       prev={index > 0 ? link(index - 1) : null}

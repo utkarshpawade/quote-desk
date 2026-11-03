@@ -82,11 +82,47 @@ const SHOTS: Shot[] = [
     },
     fullPage: true,
   },
+  {
+    name: "costing-023-suggestions",
+    user: ESTIMATOR,
+    go: async (p) => {
+      await openRfq(p, "RFQ-2611-023");
+      await p.getByRole("link", { name: "1 · Gear blank" }).click();
+      await p.waitForURL(/\/parts\//);
+      await p.getByText("Start from a similar past part", { exact: true }).waitFor();
+    },
+    fullPage: true,
+  },
+  { name: "past-quotes", user: ESTIMATOR, go: async (p) => void (await p.goto(`${BASE}/past-quotes?q=spindle`)) },
+  {
+    name: "past-quotes-similar",
+    user: ESTIMATOR,
+    go: async (p) => {
+      await openRfq(p, "RFQ-2611-014");
+      await p.getByRole("link", { name: "1 · Rear wheel spindle" }).click();
+      await p.waitForURL(/\/parts\//);
+      await p.getByRole("link", { name: /^See \d+ similar$/ }).first().click();
+      await p.waitForURL(/similar=/);
+      await p.locator("button:visible", { hasText: /Q\/\d\d-\d\d\// }).first().click();
+      await p.getByRole("dialog").waitFor();
+    },
+  },
+  {
+    name: "imports-errors",
+    user: ESTIMATOR,
+    go: async (p) => {
+      await p.goto(`${BASE}/imports`);
+      await p.getByRole("button", { name: /deliberate mistakes/ }).click();
+      await p.getByText("Row report").waitFor({ timeout: 60_000 });
+    },
+    fullPage: true,
+  },
 ];
 
 async function main() {
   mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch();
+  const failures: string[] = [];
   for (const viewport of [
     { label: "desktop", width: 1440, height: 900 },
     { label: "laptop", width: 1366, height: 768 },
@@ -102,8 +138,15 @@ async function main() {
         await page.click("button[type=submit]");
         await page.waitForURL(/\/rfqs/, { timeout: 60_000 });
       }
-      await shot.go(page);
-      await page.waitForLoadState("networkidle");
+      page.setDefaultTimeout(45_000);
+      try {
+        await shot.go(page);
+        await page.waitForLoadState("networkidle");
+      } catch (error) {
+        failures.push(`${shot.name}-${viewport.label}: ${(error as Error).message.split("\n")[0]}`);
+        await context.close();
+        continue;
+      }
       const file = path.join(OUT, `${shot.name}-${viewport.label}.png`);
       await page.screenshot({ path: file, fullPage: shot.fullPage ?? false });
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
@@ -112,6 +155,10 @@ async function main() {
     }
   }
   await browser.close();
+  if (failures.length) {
+    console.error(`Failed:\n${failures.join("\n")}`);
+    process.exitCode = 1;
+  }
 }
 
 main().catch((e) => {

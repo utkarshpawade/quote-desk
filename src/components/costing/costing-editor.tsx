@@ -9,15 +9,18 @@ import { Field } from "@/components/ui/field";
 import { NumberInput, Select } from "@/components/ui/input";
 import { Section } from "@/components/ui/page";
 import { Notice } from "@/components/ui/states";
-import { contextFromOptions, draftToCostingInput, type CatalogOption, type LineDraft } from "@/domain/costing/draft";
+import { contextFromOptions, draftToCostingInput, operationKindForUnit, type CatalogOption, type LineDraft, type OperationDraft } from "@/domain/costing/draft";
 import { computeCosting } from "@/domain/costing/engine";
 import type { CostingIssue } from "@/domain/costing/types";
+import { processHints } from "@/domain/intake/process-hints";
 import { cn } from "@/lib/cn";
 import { formatDateTime, formatINR, formatInteger, formatNumber } from "@/lib/format";
+import type { RoutingSuggestion, SimilarForCosting } from "@/server/services/past-quotes";
 import type { CostingView } from "@/server/services/quotes";
 import { BreakupPanel } from "./breakup-panel";
 import { ProvenanceCaption } from "./provenance";
 import { newRowId, rateLabel, RoutingTable } from "./routing-table";
+import { RoutingSuggestions } from "./routing-suggestions";
 
 type SaveState =
   | { kind: "saved"; at: string | null }
@@ -116,12 +119,13 @@ function forEditing(draft: LineDraft): LineDraft {
 
 export function CostingEditor(props: {
   view: CostingView;
+  similar: SimilarForCosting;
   editable: boolean;
   rfqHref: string;
   prev: { href: string; label: string } | null;
   next: { href: string; label: string } | null;
 }) {
-  const { view, editable } = props;
+  const { view, editable, similar } = props;
   const [draft, setDraft] = useState<LineDraft>(() => forEditing(view.line.draft));
   const { state: save, schedule } = useAutosave(view.line.id, view.line.lockVersion, editable);
 
@@ -135,7 +139,11 @@ export function CostingEditor(props: {
       }),
     [view],
   );
-  const result = useMemo(() => computeCosting(draftToCostingInput(draft, ctx), { marginFloorPct: view.params.marginFloorPct }), [draft, ctx, view.params.marginFloorPct]);
+  const benchmark = similar.benchmark?.medianConversionPerKg ?? null;
+  const result = useMemo(
+    () => computeCosting(draftToCostingInput(draft, ctx), { marginFloorPct: view.params.marginFloorPct, similarMedianConversionPerKg: benchmark }),
+    [draft, ctx, view.params.marginFloorPct, benchmark],
+  );
 
   function update(change: Partial<LineDraft>) {
     const next = { ...draft, ...change };
@@ -153,6 +161,36 @@ export function CostingEditor(props: {
   const prov = view.provenance;
   const forged = Boolean(draft.forgedWeightKg);
   const unconfirmed = draft.operations.filter((o) => !o.confirmed).length;
+  // Drawing processes the routing does not cover yet ("induction hardening" with no IH operation).
+  const covered = processHints(draft.operations.map((o) => `${o.name} ${view.options.find((x) => x.id === o.itemId)?.name ?? ""} ${o.legacyName ?? ""}`).join(" | "));
+  const uncovered = view.part.processHints.filter((h) => !covered.includes(h));
+  // Cycle times copied from a part of very different weight need a second look (> 20 %).
+  const copiedFrom = similar.suggestions.find((s) => draft.operations.some((o) => !o.confirmed && o.suggestedFromId === s.id));
+  const weightGap =
+    copiedFrom?.grossWeightKg && draft.grossWeightKg && Number(draft.grossWeightKg) > 0
+      ? (Number(copiedFrom.grossWeightKg) - Number(draft.grossWeightKg)) / Number(draft.grossWeightKg)
+      : null;
+
+  function applyRouting(s: RoutingSuggestion) {
+    const operations: OperationDraft[] = s.ops.map((op) => {
+      const option = op.itemId ? view.options.find((o) => o.id === op.itemId && o.ref) : undefined;
+      const kind = option ? operationKindForUnit(option.unit) : op.kind;
+      const basis = op.weightBasis ?? option?.defaultWeightBasis ?? "GROSS";
+      return {
+        id: newRowId(),
+        name: (option?.name ?? op.name).replace(/ \(job work\)$/, ""),
+        itemId: option?.id ?? null,
+        kind,
+        cycleTimeMin: kind === "MACHINE" ? op.cycleTimeMin : null,
+        setupMin: kind === "MACHINE" ? op.setupMin : null,
+        weightBasis: kind === "PROCESS_KG" ? (basis === "FORGED" && !forged ? "GROSS" : basis) : null,
+        suggestedFromId: s.id,
+        legacyName: option ? null : (op.legacyName ?? op.name),
+        confirmed: false,
+      };
+    });
+    update({ operations, routingConfirmed: false });
+  }
 
   function addTier() {
     update({ tiers: [...draft.tiers, { volume: 0, marginPct: view.params.ladder?.basePct ?? "12", isBase: false }] });
@@ -288,7 +326,9 @@ export function CostingEditor(props: {
             {draft.operations.length === 0 ? (
               <div className="rounded-md border border-dashed border-line-strong px-4 py-6 text-center">
                 <p className="text-sm font-medium">No routing yet</p>
-                <p className="mt-1 text-dense text-ink-3">Add the first operation. The price stays withheld until the part has a routing.</p>
+                <p className="mt-1 text-dense text-ink-3">
+                  {similar.suggestions.length ? "Start from a similar past part below, or add the first operation." : "Add the first operation."} The price stays withheld until the part has a routing.
+                </p>
                 {editable ? (
                   <Button
                     className="mt-3"
@@ -301,6 +341,7 @@ export function CostingEditor(props: {
                     <Plus /> Add operation
                   </Button>
                 ) : null}
+                <RoutingSuggestions suggestions={similar.suggestions} href={similar.href} editable={editable} onUse={applyRouting} />
               </div>
             ) : (
               <RoutingTable
@@ -310,12 +351,19 @@ export function CostingEditor(props: {
                 issues={issues}
                 editable={editable}
                 hasForged={forged}
-                suggestedFromLabel={() => null}
+                suggestedFromLabel={(id) => (id ? (similar.labels[id] ?? null) : null)}
                 setupPerBatch={result.setupPerBatch}
                 onChange={(operations) => update({ operations, routingConfirmed: operations.every((o) => o.confirmed) })}
               />
             )}
-            {view.part.processHints.length ? (
+            {weightGap !== null && Math.abs(weightGap) > 0.2 && unconfirmed > 0 ? (
+              <p className="mt-3 text-xs text-warn">
+                Cycle times were copied from {copiedFrom!.refNo}, a part {Math.round(Math.abs(weightGap) * 100)} % {weightGap > 0 ? "heavier" : "lighter"} than this one — check them before confirming.
+              </p>
+            ) : null}
+            {uncovered.length && draft.operations.length ? (
+              <p className="mt-3 text-xs text-warn">Drawing notes call for {uncovered.join(", ")} — not in the routing yet.</p>
+            ) : view.part.processHints.length ? (
               <p className="mt-3 text-xs text-ink-3">Drawing notes mention: {view.part.processHints.join(", ")}.</p>
             ) : null}
           </Section>
@@ -468,6 +516,7 @@ export function CostingEditor(props: {
             onMargin={(i, marginPct) => update({ tiers: draft.tiers.map((t, j) => (j === i ? { ...t, marginPct } : t)) })}
             onAddTier={addTier}
             onRemoveTier={(i) => update({ tiers: draft.tiers.filter((_, j) => j !== i) })}
+            similar={similar.count ? { count: similar.count, href: similar.href, medianConversionPerKg: benchmark } : null}
           />
 
           <div className={cn("rounded-lg border bg-surface px-3 py-2.5 text-dense", errors.length ? "border-danger/30" : "border-line")}>
