@@ -10,8 +10,14 @@ import { PrismaClient } from "@/generated/prisma/client";
  */
 export function createPrismaClient(connectionString = process.env.DATABASE_URL) {
   if (!connectionString) throw new Error("DATABASE_URL is not set");
-  const adapter = new PrismaPg({ connectionString, max: 5, connectionTimeoutMillis: 10_000 });
+  const adapter = new PrismaPg({ connectionString, max: 5, connectionTimeoutMillis: 15_000 });
   return new PrismaClient({ adapter, omit: { storedFile: { data: true } } });
 }
 
 export type Db = ReturnType<typeof createPrismaClient>;
+
+/** The client inside an interactive transaction. */
+export type Tx = Omit<Db, "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends">;
+
+/** Services accept either, so they compose inside a caller's transaction. */
+export type DbOrTx = Db | Tx;
