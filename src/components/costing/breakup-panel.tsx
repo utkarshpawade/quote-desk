@@ -149,7 +149,8 @@ export function BreakupPanel(props: {
             </tr>
           ))}
           <tr>
-            <td colSpan={cols + 2} className="h-2" />
+            {/* Exactly the declared columns: an extra one would take width from the volumes (table-fixed). */}
+            <td colSpan={1 + cols + (editable && tiers.length < 3 ? 1 : 0)} className="h-2" />
           </tr>
         </tfoot>
       </table>
