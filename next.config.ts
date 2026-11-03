@@ -10,9 +10,9 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   // Native/Node-heavy libraries used only on the server.
   serverExternalPackages: ["@react-pdf/renderer", "xlsx", "unpdf"],
-  // Fonts for server-rendered PDFs are read from disk at runtime; make sure Vercel ships them.
+  // Read from disk at runtime (PDF fonts, sample RFQ packs, the demo seed's register): ship them on Vercel.
   outputFileTracingIncludes: {
-    "/**": ["./src/server/pdf/fonts/**/*"],
+    "/**": ["./src/server/pdf/fonts/**/*", "./sample-data/rfq-packs/**/*", "./sample-data/past-quotes-2023-2026.xlsx"],
   },
   poweredByHeader: false,
   async headers() {

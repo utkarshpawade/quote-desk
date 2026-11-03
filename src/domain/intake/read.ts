@@ -88,9 +88,13 @@ export function toCandidate(raw: RawValue, source: SourceInfo, ctx: ReadContext)
   }
 
   const evidence = raw.evidence?.trim() || null;
+  // Grounded = the evidence is really in the source, and the value is in the evidence as written
+  // (or follows from it, e.g. "3,000 nos/month" → 36,000 a year).
   const grounded =
     source.mode === "PARSER" ||
-    (evidence !== null && isGrounded(evidence, source.text) && (spec.type === "material" || evidenceSupports(spec.type, value, evidence)));
+    (evidence !== null &&
+      isGrounded(evidence, source.text) &&
+      (spec.type === "material" || isGrounded(text, evidence) || evidenceSupports(spec.type, value, evidence)));
   const plausible = checkPlausible(spec.type, value, { receivedDate: ctx.receivedDate });
   const { confidence, reason } = rateConfidence({ mode: source.mode, fromImage: source.kind === "DRAWING_IMAGE", grounded, notes, plausible, inMaster });
 

@@ -34,7 +34,10 @@ const TITLE_BLOCK_RULES: Rule[] = [
   { fieldKey: "surfaceTreatment", re: /\b(?:FINISH|SURFACE (?:TREATMENT|FINISH))\s*[:\-]\s*([A-Z][A-Z0-9 \-&]{3,40})/i, level: "part" },
 ];
 
-/** Reads labelled values line by line; `lineLocator` turns a 0-based index into "line 12". */
+/** A part number written on the same line ("Hub spacer E-SPC-314: monthly schedule …"). */
+const PART_NO_IN_LINE = /\b([A-Z]{1,5}-[A-Z0-9]{2,}(?:-[A-Z0-9]+)+)\b/;
+
+/** Reads labelled values line by line, noting the line number and, for part fields, the part. */
 export function readByRules(text: string, kind: "EMAIL" | "TITLE_BLOCK"): RawValue[] {
   const rules = kind === "EMAIL" ? EMAIL_RULES : TITLE_BLOCK_RULES;
   const lines = text.split(/\r?\n/);
@@ -52,7 +55,7 @@ export function readByRules(text: string, kind: "EMAIL" | "TITLE_BLOCK"): RawVal
         raw: m[1].trim(),
         evidence: line.trim(),
         locator: kind === "EMAIL" ? `line ${index + 1}` : "title block",
-        part: rule.level === "part" ? {} : undefined,
+        part: rule.level === "part" ? { partNo: PART_NO_IN_LINE.exec(line)?.[1] ?? null } : undefined,
       });
     }
   });

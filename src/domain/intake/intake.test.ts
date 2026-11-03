@@ -158,6 +158,27 @@ describe("rule-based fallback", () => {
     expect(Object.keys(read)).not.toContain("unitPrice");
   });
 
+  it("ties a value to the part named on its line and grounds an annualized schedule", () => {
+    const text = numberLines("Hubs LH and RH: 36,000 nos per annum each.\nHub spacer E-SPC-314: monthly schedule 3,000 nos/month.");
+    const spacer = readByRules(text, "EMAIL").find((r) => r.fieldKey === "annualVolume")!;
+    expect(spacer).toMatchObject({ raw: "3,000 nos/month", part: { partNo: "E-SPC-314" } });
+    const c = toCandidate(spacer, { id: "e", kind: "EMAIL", label: "Email", text, mode: "RULES" }, { materials })!;
+    expect(c).toMatchObject({ value: "36000", grounded: true, confidence: "MEDIUM" });
+    expect(c.reason).toContain("3,000/month × 12");
+  });
+
+  it("puts values that name no part on the only part, or marks them unmatched", () => {
+    const anon = (sourceId: string): Candidate => ({
+      fieldKey: "annualVolume", value: "60000", display: "60,000 / yr", sourceId, sourceKind: "EMAIL", sourceLabel: "Email",
+      locator: "line 4", evidence: "Annual requirement: 60,000 nos", mode: "RULES", grounded: true, confidence: "MEDIUM", reason: "rule-based reading", part: {},
+    });
+    const named = (partNo: string): Candidate => ({ ...anon("x"), fieldKey: "partNo", value: partNo, display: partNo, sourceId: `xl-${partNo}`, part: { partNo } });
+    const single = mergeCandidates([named("DRV-GB-2207"), anon("mail")]);
+    expect(single.find((p) => p.fieldKey === "annualVolume")!.partKey).toBe("DRVGB2207");
+    const several = mergeCandidates([named("A-B-1"), named("C-D-2"), anon("mail")]);
+    expect(several.find((p) => p.fieldKey === "annualVolume")).toMatchObject({ partKey: "UNMATCHED", partLabel: "Values not matched to a part" });
+  });
+
   it("reads a title block", () => {
     const read = Object.fromEntries(readByRules("PART NAME GEAR BLANK\nPART NO DRV-GB-2207  REV C\nMATERIAL 20MnCr5\nWEIGHT 1.12 KG", "TITLE_BLOCK").map((r) => [r.fieldKey, r.raw]));
     expect(read).toMatchObject({ description: "GEAR BLANK", partNo: "DRV-GB-2207", drawingRev: "C", material: "20MnCr5", netWeightKg: "1.12 KG" });

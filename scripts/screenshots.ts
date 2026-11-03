@@ -28,6 +28,29 @@ const SHOTS: Shot[] = [
   { name: "register-estimator", user: ESTIMATOR, go: async (p) => void (await p.goto(`${BASE}/rfqs`)) },
   { name: "register-sales-head", user: SALES_HEAD, go: async (p) => void (await p.goto(`${BASE}/rfqs`)) },
   { name: "workspace-019", user: SALES_HEAD, go: (p) => openRfq(p, "RFQ-2611-019"), fullPage: true },
+  { name: "intake-new", user: ESTIMATOR, go: async (p) => void (await p.goto(`${BASE}/intake/new`)) },
+  {
+    name: "intake-review-sample-d",
+    user: ESTIMATOR,
+    go: async (p) => {
+      await p.goto(`${BASE}/intake/new`);
+      await p.getByRole("button", { name: "Use this sample" }).first().click();
+      await p.waitForURL(/\/intake\/(?!new)/, { timeout: 60_000 });
+      await p.getByText(/decided/).first().waitFor({ timeout: 90_000 });
+    },
+    fullPage: true,
+  },
+  {
+    name: "intake-review-sample-e",
+    user: ESTIMATOR,
+    go: async (p) => {
+      await p.goto(`${BASE}/intake/new`);
+      await p.getByRole("button", { name: "Use this sample" }).nth(1).click();
+      await p.waitForURL(/\/intake\/(?!new)/, { timeout: 60_000 });
+      await p.getByText(/decided/).first().waitFor({ timeout: 90_000 });
+    },
+    fullPage: true,
+  },
   { name: "rates-materials", user: SALES_HEAD, go: async (p) => void (await p.goto(`${BASE}/rates`)) },
   {
     name: "rates-history",

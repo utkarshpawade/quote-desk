@@ -54,6 +54,9 @@ function comparable(fieldKey: string, value: string): string {
 
 const partNoKey = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
+/** Part key for values that could not be tied to a part. */
+export const UNMATCHED = "UNMATCHED";
+
 /**
  * Gives every part-level candidate a stable part key: the normalized part number when one is
  * known, otherwise a description that matches an existing part (trigram ≥ 0.6), otherwise new.
@@ -68,9 +71,14 @@ export function assignParts(candidates: Candidate[]): Array<Candidate & { partKe
     groups.set(groupKey, [...(groups.get(groupKey) ?? []), c]);
   }
   const keyForGroup = new Map<string, string>();
+  const anonymous: string[] = [];
   for (const [groupKey, list] of groups) {
     const partNo = list.find((c) => c.fieldKey === "partNo")?.value ?? list.find((c) => c.part?.partNo)?.part?.partNo ?? null;
     const description = list.find((c) => c.fieldKey === "description")?.value ?? list.find((c) => c.part?.description)?.part?.description ?? null;
+    if (!partNo && !description) {
+      anonymous.push(groupKey);
+      continue;
+    }
     let match = partNo ? parts.find((p) => p.partNo && partNoKey(p.partNo) === partNoKey(partNo)) : undefined;
     if (!match && description) match = parts.find((p) => p.description && trigramDice(p.description, description) >= 0.6 && (!partNo || !p.partNo));
     if (!match) {
@@ -82,10 +90,13 @@ export function assignParts(candidates: Candidate[]): Array<Candidate & { partKe
     }
     keyForGroup.set(groupKey, match.key);
   }
+  // Values that name no part (e.g. "Annual requirement: 60,000 nos") belong to the only part when
+  // there is one; with several parts they are shown apart for the estimator to place or reject.
+  for (const groupKey of anonymous) keyForGroup.set(groupKey, parts.length === 1 ? parts[0]!.key : UNMATCHED);
   return candidates.map((c) => {
     if (FIELD_BY_KEY.get(c.fieldKey)?.level !== "part") return { ...c, partKey: "" };
     const groupKey = `${c.sourceId}|${c.part?.row ?? c.part?.partNo ?? c.part?.description ?? "_"}`;
-    return { ...c, partKey: keyForGroup.get(groupKey) ?? "PART-1" };
+    return { ...c, partKey: keyForGroup.get(groupKey) ?? UNMATCHED };
   });
 }
 
@@ -112,7 +123,8 @@ export function mergeCandidates(input: Candidate[]): Proposal[] {
       distinct.set(k, [...(distinct.get(k) ?? []), c]);
     }
     const sorted = [...list].sort((a, b) => RANK[b.confidence] - RANK[a.confidence]);
-    const base = { partKey, partLabel: partKey ? (labels.get(partKey) ?? partKey) : null, fieldKey, candidates: sorted, sortOrder: fieldOrder(fieldKey) };
+    const partLabel = !partKey ? null : partKey === UNMATCHED ? "Values not matched to a part" : (labels.get(partKey) ?? partKey);
+    const base = { partKey, partLabel, fieldKey, candidates: sorted, sortOrder: fieldOrder(fieldKey) };
 
     if (distinct.size > 1) {
       const variants = [...distinct.values()].map((cs) => `${cs[0]!.display} (${cs.map((c) => c.sourceLabel).join(", ")})`);
