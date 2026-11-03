@@ -37,14 +37,15 @@ const MAX_ISSUES = 300;
 
 /** Sample files reviewers can import in one click (they ship with the app). */
 export const SAMPLE_IMPORTS = {
-  register: { file: "sample-data/past-quotes-2023-2026.xlsx", label: "Quote register 2023–26 (1,400 rows)" },
-  errors: { file: "sample-data/past-quotes-with-errors.xlsx", label: "Register extract with 7 deliberate mistakes (60 rows)" },
+  register: { file: "past-quotes-2023-2026.xlsx", label: "Quote register 2023–26 (1,400 rows)" },
+  errors: { file: "past-quotes-with-errors.xlsx", label: "Register extract with 7 deliberate mistakes (60 rows)" },
 } as const;
 export type SampleImport = keyof typeof SAMPLE_IMPORTS;
 
 export async function readSampleImport(key: SampleImport): Promise<{ bytes: Uint8Array; filename: string }> {
-  const file = SAMPLE_IMPORTS[key].file;
-  return { bytes: new Uint8Array(await readFile(path.join(process.cwd(), file))), filename: path.basename(file) };
+  const { file } = SAMPLE_IMPORTS[key];
+  // The folder is a literal so the deployment bundles sample-data only, not the whole project.
+  return { bytes: new Uint8Array(await readFile(path.join(process.cwd(), "sample-data", file))), filename: file };
 }
 
 export interface ImportColumn {
