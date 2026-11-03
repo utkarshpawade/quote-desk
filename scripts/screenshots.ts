@@ -28,6 +28,16 @@ const SHOTS: Shot[] = [
   { name: "register-estimator", user: ESTIMATOR, go: async (p) => void (await p.goto(`${BASE}/rfqs`)) },
   { name: "register-sales-head", user: SALES_HEAD, go: async (p) => void (await p.goto(`${BASE}/rfqs`)) },
   { name: "workspace-019", user: SALES_HEAD, go: (p) => openRfq(p, "RFQ-2611-019"), fullPage: true },
+  { name: "rates-materials", user: SALES_HEAD, go: async (p) => void (await p.goto(`${BASE}/rates`)) },
+  {
+    name: "rates-history",
+    user: SALES_HEAD,
+    go: async (p) => {
+      await p.goto(`${BASE}/rates`);
+      await p.getByRole("button", { name: "MAT-EN8", exact: true }).click();
+      await p.getByRole("dialog").waitFor();
+    },
+  },
   {
     name: "quote-019",
     user: SALES_HEAD,
