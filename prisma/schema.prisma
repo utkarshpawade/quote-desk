@@ -1,0 +1,812 @@
+// Quote Desk data model. See docs/DESIGN.md §6 for the reasoning behind each table.
+//
+// Conventions
+// - Money numeric(14,2) (annual values numeric(16,2)), rates numeric(14,4), weights numeric(10,3) kg,
+//   minutes numeric(8,3), percentages numeric(6,3). Business dates are @db.Date (Asia/Kolkata days).
+// - Rate versions are append-only (corrections void a version); quotes point at the exact versions
+//   they priced with and freeze an append-only canonical snapshot on submit.
+// - StoredFile.data is globally omitted by the Prisma client and only read by the download route.
+// - The init migration adds what Prisma cannot express: the pg_trgm extension and triggers that make
+//   AuditEvent and QuoteSnapshot append-only and RateVersion immutable except for voiding.
+
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────────── people & access ─────────────────────────────
+
+enum Role {
+  ESTIMATOR
+  SALES_HEAD
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  role         Role
+  passwordHash String
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  sessions        Session[]
+  ownedRfqs       Rfq[]             @relation("RfqOwner")
+  createdRfqs     Rfq[]             @relation("RfqCreatedBy")
+  rateVersions    RateVersion[]     @relation("RateVersionCreatedBy")
+  voidedVersions  RateVersion[]     @relation("RateVersionVoidedBy")
+  submittedQuotes Quote[]           @relation("QuoteSubmittedBy")
+  decidedQuotes   Quote[]           @relation("QuoteDecidedBy")
+  sentQuotes      Quote[]           @relation("QuoteSentBy")
+  snapshots       QuoteSnapshot[]
+  intakeSessions  IntakeSession[]
+  decidedFields   ExtractedField[]
+  provenances     FieldProvenance[]
+  uploadedFiles   StoredFile[]
+  fileAccesses    FileAccess[]
+  importBatches   ImportBatch[]
+  auditEvents     AuditEvent[]
+  outboxMessages  OutboxMessage[]
+}
+
+model Session {
+  /// SHA-256 (hex) of the random cookie token; the token itself is never stored.
+  id         String   @id
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  expiresAt  DateTime
+  ip         String?
+  userAgent  String?
+
+  @@index([userId])
+}
+
+model LoginAttempt {
+  id      String   @id @default(cuid())
+  email   String
+  ip      String?
+  success Boolean
+  at      DateTime @default(now())
+
+  @@index([email, at])
+  @@index([ip, at])
+}
+
+// ───────────────────────────── customers ─────────────────────────────
+
+enum Segment {
+  TWO_WHEELER
+  TRACTOR
+  DRIVETRAIN
+  TIER1
+  OFF_HIGHWAY
+  COMMERCIAL_VEHICLE
+}
+
+enum MarginBasis {
+  /// Profit on manufacturing cost (material, BOP, conversion, rejection, overhead, ICC).
+  MFG_COST
+  /// Profit on in-house conversion only (machining, setup, in-house processes).
+  CONVERSION
+}
+
+enum GstClass {
+  GST_18
+  GST_5
+}
+
+model Customer {
+  id            String      @id @default(cuid())
+  code          String      @unique
+  name          String
+  segment       Segment
+  city          String
+  emailDomain   String?     @unique
+  contactName   String?
+  contactEmail  String?
+  paymentTerms  String
+  marginBasis   MarginBasis @default(MFG_COST)
+  /// False when the customer's NDA forbids sending its documents to any AI service.
+  aiAllowed     Boolean     @default(true)
+  freightItemId String?
+  freightItem   RateItem?   @relation("CustomerFreight", fields: [freightItemId], references: [id])
+  packingItemId String?
+  packingItem   RateItem?   @relation("CustomerPacking", fields: [packingItemId], references: [id])
+  createdAt     DateTime    @default(now())
+
+  rfqs       Rfq[]
+  pastQuotes PastQuote[]
+}
+
+// ───────────────────────────── RFQs ─────────────────────────────
+
+enum RfqStatus {
+  ESTIMATING
+  IN_APPROVAL
+  APPROVED
+  SENT
+  WON
+  LOST
+  REGRETTED
+}
+
+enum CloseReason {
+  PRICE
+  LEAD_TIME
+  TECHNICAL
+  LATE_REPLY
+  CUSTOMER_CANCELLED
+  INCUMBENT_RETAINED
+  CAPACITY
+  OTHER
+}
+
+model Rfq {
+  id          String       @id @default(cuid())
+  number      String       @unique
+  customerId  String
+  customer    Customer     @relation(fields: [customerId], references: [id])
+  customerRef String?
+  subject     String
+  receivedAt  DateTime
+  dueDate     DateTime     @db.Date
+  ownerId     String
+  owner       User         @relation("RfqOwner", fields: [ownerId], references: [id])
+  status      RfqStatus    @default(ESTIMATING)
+  closeReason CloseReason?
+  closeNote   String?
+  closedAt    DateTime?
+  createdById String
+  createdBy   User         @relation("RfqCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  parts          RfqPart[]
+  quotes         Quote[]
+  files          StoredFile[]
+  intakeSessions IntakeSession[]
+  provenances    FieldProvenance[]
+  events         AuditEvent[]
+
+  @@index([status, dueDate])
+  @@index([ownerId])
+  @@index([customerId])
+}
+
+model RfqPart {
+  id               String    @id @default(cuid())
+  rfqId            String
+  rfq              Rfq       @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  lineNo           Int
+  partNo           String
+  description      String
+  drawingNo        String?
+  drawingRev       String?
+  /// Material exactly as the customer wrote it; materialItem is the master grade it maps to.
+  materialText     String?
+  materialItemId   String?
+  materialItem     RateItem? @relation("PartMaterial", fields: [materialItemId], references: [id])
+  grossWeightKg    Decimal?  @db.Decimal(10, 3)
+  forgedWeightKg   Decimal?  @db.Decimal(10, 3)
+  netWeightKg      Decimal?  @db.Decimal(10, 3)
+  annualVolume     Int?
+  heatTreatment    String?
+  surfaceTreatment String?
+  /// Process cues read locally from drawing notes, e.g. "induction hardening".
+  processHints     String[]  @default([])
+  gstClass         GstClass  @default(GST_18)
+  hsnCode          String?
+  notes            String?
+  createdAt        DateTime  @default(now())
+
+  quoteLines  QuoteLine[]
+  provenances FieldProvenance[]
+
+  @@unique([rfqId, lineNo])
+}
+
+// ───────────────────────────── rate masters ─────────────────────────────
+
+enum RateCategory {
+  MATERIAL
+  SCRAP
+  BOP
+  MACHINE
+  PROCESS
+  PACKING
+  FREIGHT
+  COMMERCIAL
+}
+
+enum RateUnit {
+  PER_KG
+  PER_HOUR
+  PER_PIECE
+  PERCENT
+  RUPEES
+  COUNT
+  DAYS
+}
+
+model RateItem {
+  id         String       @id @default(cuid())
+  category   RateCategory
+  code       String       @unique
+  name       String
+  unit       RateUnit
+  /// Category details: grade, family, form, aliases and scrap items for materials; inHouse for
+  /// processes; zone for freight. Validated by src/domain/rates/attributes.ts.
+  attributes Json         @default("{}")
+  active     Boolean      @default(true)
+  sortOrder  Int          @default(0)
+  createdAt  DateTime     @default(now())
+
+  versions          RateVersion[]
+  partMaterials     RfqPart[]     @relation("PartMaterial")
+  customerFreight   Customer[]    @relation("CustomerFreight")
+  customerPacking   Customer[]    @relation("CustomerPacking")
+  pastQuoteMaterial PastQuote[]
+
+  @@index([category, sortOrder])
+}
+
+model RateVersion {
+  id            String    @id @default(cuid())
+  rateItemId    String
+  rateItem      RateItem  @relation(fields: [rateItemId], references: [id], onDelete: Restrict)
+  value         Decimal   @db.Decimal(14, 4)
+  effectiveFrom DateTime  @db.Date
+  note          String?
+  createdById   String
+  createdBy     User      @relation("RateVersionCreatedBy", fields: [createdById], references: [id])
+  createdAt     DateTime  @default(now())
+  voidedAt      DateTime?
+  voidedById    String?
+  voidedBy      User?     @relation("RateVersionVoidedBy", fields: [voidedById], references: [id])
+  voidReason    String?
+
+  lineMaterial QuoteLine[]      @relation("LineMaterial")
+  lineScrap    QuoteLine[]      @relation("LineScrap")
+  lineFlash    QuoteLine[]      @relation("LineFlash")
+  linePacking  QuoteLine[]      @relation("LinePacking")
+  lineFreight  QuoteLine[]      @relation("LineFreight")
+  operations   QuoteOperation[]
+  quoteParams  QuoteParam[]
+
+  /// One live version per item and date; voided versions keep their history.
+  @@unique([rateItemId, effectiveFrom], map: "RateVersion_live_item_date_key", where: raw("\"voidedAt\" IS NULL"))
+  @@index([rateItemId, effectiveFrom])
+}
+
+// ───────────────────────────── quotes & costing ─────────────────────────────
+
+enum QuoteStatus {
+  DRAFT
+  IN_APPROVAL
+  APPROVED
+  SENT
+  SUPERSEDED
+}
+
+enum ToolingMode {
+  NONE
+  SEPARATE
+  AMORTIZED
+}
+
+enum OperationKind {
+  MACHINE
+  PROCESS_KG
+  PROCESS_PC
+  BOP
+}
+
+enum WeightBasis {
+  GROSS
+  FORGED
+  NET
+}
+
+model Quote {
+  id               String      @id @default(cuid())
+  rfqId            String
+  rfq              Rfq         @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  revision         Int
+  number           String      @unique
+  status           QuoteStatus @default(DRAFT)
+  /// Cost rates are resolved as of this date.
+  basisDate        DateTime    @db.Date
+  /// Required when the basis date is not the day the quote was priced; shown to the approver.
+  basisReason      String?
+  validityDays     Int         @default(30)
+  marginBasis      MarginBasis @default(MFG_COST)
+  /// Filled on submit: Σ parts (base-tier price × RFQ volume) + separately charged tooling.
+  approvalValue    Decimal?    @db.Decimal(16, 2)
+  requiresApproval Boolean?
+  /// Optimistic lock for status transitions (compare-and-set).
+  lockVersion      Int         @default(0)
+  /// Parts the approver tagged when returning the quote.
+  returnedPartIds  String[]    @default([])
+
+  submittedById String?
+  submittedBy   User?     @relation("QuoteSubmittedBy", fields: [submittedById], references: [id])
+  submittedAt   DateTime?
+  decidedById   String?
+  decidedBy     User?     @relation("QuoteDecidedBy", fields: [decidedById], references: [id])
+  decidedAt     DateTime?
+  decisionNote  String?
+  sentById      String?
+  sentBy        User?     @relation("QuoteSentBy", fields: [sentById], references: [id])
+  sentAt        DateTime?
+  sentTo        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines     QuoteLine[]
+  params    QuoteParam[]
+  snapshots QuoteSnapshot[]
+  outbox    OutboxMessage[]
+  events    AuditEvent[]
+
+  @@unique([rfqId, revision])
+  @@index([status])
+}
+
+/// Quote-wide parameters resolved from the commercial master: cost policy at the basis date
+/// (overhead, ICC) and approval policy at submit (threshold, margin floor, GST).
+model QuoteParam {
+  id            String      @id @default(cuid())
+  quoteId       String
+  quote         Quote       @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  key           String
+  rateVersionId String
+  rateVersion   RateVersion @relation(fields: [rateVersionId], references: [id])
+
+  @@unique([quoteId, key])
+}
+
+/// Frozen on submit. Append-only: a return and resubmit adds seq 2, 3 …
+model QuoteSnapshot {
+  id            String   @id @default(cuid())
+  quoteId       String
+  quote         Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  seq           Int
+  /// Canonical JSON (sorted keys, decimals as fixed-scale strings) — hashed byte for byte.
+  body          String   @db.Text
+  hash          String
+  engineVersion String
+  createdById   String
+  createdBy     User     @relation(fields: [createdById], references: [id])
+  createdAt     DateTime @default(now())
+
+  @@unique([quoteId, seq])
+}
+
+model QuoteLine {
+  id                  String       @id @default(cuid())
+  quoteId             String
+  quote               Quote        @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  rfqPartId           String
+  rfqPart             RfqPart      @relation(fields: [rfqPartId], references: [id])
+  grossWeightKg       Decimal?     @db.Decimal(10, 3)
+  forgedWeightKg      Decimal?     @db.Decimal(10, 3)
+  netWeightKg         Decimal?     @db.Decimal(10, 3)
+  scaleLossPct        Decimal?     @db.Decimal(6, 3)
+  materialVersionId   String?
+  materialVersion     RateVersion? @relation("LineMaterial", fields: [materialVersionId], references: [id])
+  scrapVersionId      String?
+  scrapVersion        RateVersion? @relation("LineScrap", fields: [scrapVersionId], references: [id])
+  flashScrapVersionId String?
+  flashScrapVersion   RateVersion? @relation("LineFlash", fields: [flashScrapVersionId], references: [id])
+  packingVersionId    String?
+  packingVersion      RateVersion? @relation("LinePacking", fields: [packingVersionId], references: [id])
+  freightVersionId    String?
+  freightVersion      RateVersion? @relation("LineFreight", fields: [freightVersionId], references: [id])
+  rejectionPct        Decimal      @db.Decimal(6, 3)
+  batchesPerYear      Int
+  gstClass            GstClass     @default(GST_18)
+  toolingMode         ToolingMode  @default(NONE)
+  toolingCost         Decimal      @default(0) @db.Decimal(14, 2)
+  toolingAmortYears   Int?
+  toolingNote         String?
+  /// False while operations copied from a past part await the estimator's confirmation.
+  routingConfirmed    Boolean      @default(true)
+  notes               String?
+  /// Per-part optimistic lock so autosaves on different parts never conflict.
+  lockVersion         Int          @default(0)
+  /// Estimator effort tracking (success metric: 2.5 h → 1 h per part).
+  costingStartedAt    DateTime?
+  lastActivityAt      DateTime?
+  activeSeconds       Int          @default(0)
+  updatedAt           DateTime     @updatedAt
+
+  operations QuoteOperation[]
+  tiers      QuoteTier[]
+  pastQuote  PastQuote?
+
+  @@unique([quoteId, rfqPartId])
+}
+
+model QuoteOperation {
+  id              String        @id @default(cuid())
+  lineId          String
+  line            QuoteLine     @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  seq             Int
+  name            String
+  kind            OperationKind
+  /// Null while a copied legacy operation is not yet bound to a current work centre.
+  rateVersionId   String?
+  rateVersion     RateVersion?  @relation(fields: [rateVersionId], references: [id])
+  /// Name as written in the past quote it was copied from (unbound operations).
+  legacyName      String?
+  cycleTimeMin    Decimal?      @db.Decimal(8, 3)
+  setupMin        Decimal?      @db.Decimal(8, 3)
+  weightBasis     WeightBasis?
+  /// BOP quantity per piece.
+  quantity        Decimal?      @db.Decimal(10, 3)
+  suggestedFromId String?
+  suggestedFrom   PastQuote?    @relation(fields: [suggestedFromId], references: [id], onDelete: SetNull)
+  confirmed       Boolean       @default(true)
+
+  @@index([lineId, seq])
+}
+
+model QuoteTier {
+  id        String    @id @default(cuid())
+  lineId    String
+  line      QuoteLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  sortOrder Int
+  volume    Int
+  marginPct Decimal   @db.Decimal(6, 3)
+  /// The tier at the RFQ's annual volume: read-only, cannot be removed, drives approval.
+  isBase    Boolean   @default(false)
+
+  @@unique([lineId, sortOrder])
+}
+
+// ───────────────────────────── AI intake ─────────────────────────────
+
+enum IntakeStatus {
+  EXTRACTING
+  REVIEW
+  COMPLETED
+  FAILED
+  DISCARDED
+}
+
+enum SourceKind {
+  EMAIL
+  PASTED_TEXT
+  EXCEL
+  DRAWING_PDF
+  DRAWING_IMAGE
+}
+
+enum SourceStatus {
+  PENDING
+  PROCESSING
+  DONE
+  NO_TEXT
+  FAILED
+}
+
+enum ExtractionMode {
+  AI
+  RULES
+  PARSER
+}
+
+enum Confidence {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum FieldStatus {
+  PENDING
+  ACCEPTED
+  EDITED
+  REJECTED
+}
+
+enum DecidedVia {
+  SINGLE
+  COLUMN
+  AGREED
+  EDITED
+}
+
+model IntakeSession {
+  id                String       @id @default(cuid())
+  status            IntakeStatus @default(EXTRACTING)
+  rfqId             String?
+  rfq               Rfq?         @relation(fields: [rfqId], references: [id], onDelete: SetNull)
+  createdById       String
+  createdBy         User         @relation(fields: [createdById], references: [id])
+  /// Model used for AI extraction; null when every source used the parser or the rule fallback.
+  aiModel           String?
+  fallbackReason    String?
+  error             String?
+  createdAt         DateTime     @default(now())
+  reviewStartedAt   DateTime?
+  reviewCompletedAt DateTime?
+
+  sources IntakeSource[]
+  fields  ExtractedField[]
+
+  @@index([status, createdAt])
+}
+
+model IntakeSource {
+  id         String          @id @default(cuid())
+  sessionId  String
+  session    IntakeSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  /// An email's attachments are child sources of the email.
+  parentId   String?
+  parent     IntakeSource?   @relation("SourceAttachments", fields: [parentId], references: [id], onDelete: Cascade)
+  children   IntakeSource[]  @relation("SourceAttachments")
+  kind       SourceKind
+  label      String
+  fileId     String?
+  file       StoredFile?     @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  status     SourceStatus    @default(PENDING)
+  mode       ExtractionMode?
+  model      String?
+  error      String?
+  /// Text the values were read from (numbered lines for emails), shown as evidence in review.
+  text       String?
+  /// What left the system for AI extraction: character count and SHA-256 of the payload.
+  sentChars  Int?
+  sentSha256 String?
+  /// Set when the result came from the extraction cache instead of a fresh call.
+  cachedAt   DateTime?
+  meta       Json?
+  startedAt  DateTime?
+  finishedAt DateTime?
+  createdAt  DateTime        @default(now())
+
+  @@index([sessionId])
+}
+
+model ExtractedField {
+  id            String        @id @default(cuid())
+  sessionId     String
+  session       IntakeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  /// "" for RFQ-level fields, otherwise the normalized part key the field belongs to.
+  partKey       String        @default("")
+  partLabel     String?
+  fieldKey      String
+  proposedValue String?
+  /// Every candidate value with its source, locator, evidence, confidence and grounding result.
+  candidates    Json
+  confidence    Confidence
+  /// Why the confidence is what it is, in words ("15,000/month × 12").
+  reason        String?
+  conflict      Boolean       @default(false)
+  status        FieldStatus   @default(PENDING)
+  finalValue    String?
+  decidedVia    DecidedVia?
+  decidedById   String?
+  decidedBy     User?         @relation(fields: [decidedById], references: [id])
+  decidedAt     DateTime?
+  sortOrder     Int           @default(0)
+
+  provenance FieldProvenance?
+
+  @@unique([sessionId, partKey, fieldKey])
+}
+
+/// Where an accepted value on an RFQ or part came from (source marker in costing).
+model FieldProvenance {
+  id               String          @id @default(cuid())
+  rfqId            String
+  rfq              Rfq             @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  rfqPartId        String?
+  rfqPart          RfqPart?        @relation(fields: [rfqPartId], references: [id], onDelete: Cascade)
+  fieldKey         String
+  value            String
+  sourceKind       SourceKind
+  sourceLabel      String
+  locator          String?
+  evidence         String?
+  confidence       Confidence
+  decidedVia       DecidedVia
+  /// What the AI or parser proposed, when the estimator edited it.
+  proposedValue    String?
+  extractedFieldId String?         @unique
+  extractedField   ExtractedField? @relation(fields: [extractedFieldId], references: [id], onDelete: SetNull)
+  acceptedById     String
+  acceptedBy       User            @relation(fields: [acceptedById], references: [id])
+  acceptedAt       DateTime        @default(now())
+
+  @@index([rfqId])
+  @@index([rfqPartId])
+}
+
+/// Results keyed by sha256(promptVersion + model + sentText); repeat runs are labelled as cached.
+model AiExtractionCache {
+  key           String   @id
+  model         String
+  promptVersion String
+  result        Json
+  createdAt     DateTime @default(now())
+}
+
+// ───────────────────────────── files ─────────────────────────────
+
+enum FileKind {
+  RFQ_EMAIL
+  PART_LIST
+  DRAWING
+  QUOTE_PDF
+  IMPORT
+  OTHER
+}
+
+model StoredFile {
+  id           String   @id @default(cuid())
+  rfqId        String?
+  rfq          Rfq?     @relation(fields: [rfqId], references: [id], onDelete: SetNull)
+  kind         FileKind
+  filename     String
+  mimeType     String
+  sizeBytes    Int
+  sha256       String
+  data         Bytes
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  accesses      FileAccess[]
+  intakeSources IntakeSource[]
+  outbox        OutboxMessage[]
+
+  @@index([rfqId])
+  @@index([uploadedById, createdAt])
+}
+
+enum FileAction {
+  VIEW
+  DOWNLOAD
+  AI_EXTRACT
+}
+
+model FileAccess {
+  id     String     @id @default(cuid())
+  fileId String
+  file   StoredFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  userId String
+  user   User       @relation(fields: [userId], references: [id])
+  action FileAction
+  ip     String?
+  detail String?
+  at     DateTime   @default(now())
+
+  @@index([fileId, at])
+}
+
+// ───────────────────────────── past quotes & import ─────────────────────────────
+
+enum PastQuoteSource {
+  LEGACY_IMPORT
+  APP
+}
+
+enum QuoteOutcome {
+  WON
+  LOST
+  NO_RESPONSE
+  OPEN
+  REGRETTED
+}
+
+model PastQuote {
+  id             String          @id @default(cuid())
+  source         PastQuoteSource
+  refNo          String
+  quoteDate      DateTime        @db.Date
+  customerName   String
+  customerId     String?
+  customer       Customer?       @relation(fields: [customerId], references: [id])
+  partNo         String          @default("")
+  description    String
+  materialText   String?
+  materialItemId String?
+  materialItem   RateItem?       @relation(fields: [materialItemId], references: [id])
+  /// BAR or FORGING, derived on import; used to gate routing suggestions.
+  inputForm      String?
+  /// shaft / disc / arm / housing / other, derived from the description.
+  shapeFamily    String?
+  grossWeightKg  Decimal?        @db.Decimal(10, 3)
+  netWeightKg    Decimal?        @db.Decimal(10, 3)
+  annualVolume   Int?
+  unitPrice      Decimal         @db.Decimal(14, 2)
+  outcome        QuoteOutcome
+  lostReason     String?
+  estimatorName  String?
+  /// Routing as written in the legacy register, and the parsed operations.
+  routingText    String?
+  routingOps     Json?
+  quoteLineId    String?         @unique
+  quoteLine      QuoteLine?      @relation(fields: [quoteLineId], references: [id], onDelete: SetNull)
+  importBatchId  String?
+  importBatch    ImportBatch?    @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  /// Lower-cased "part no · description · material · customer" for trigram search.
+  searchText     String
+  createdAt      DateTime        @default(now())
+
+  suggestedOperations QuoteOperation[]
+
+  @@unique([source, refNo, partNo])
+  @@index([quoteDate])
+  @@index([materialItemId])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin, map: "PastQuote_searchText_trgm_idx")
+}
+
+model ImportBatch {
+  id           String   @id @default(cuid())
+  filename     String
+  fileSha256   String
+  rowsTotal    Int
+  rowsImported Int
+  rowsSkipped  Int
+  rowsFailed   Int
+  issues       Json
+  createdById  String
+  createdBy    User     @relation(fields: [createdById], references: [id])
+  createdAt    DateTime @default(now())
+
+  pastQuotes PastQuote[]
+}
+
+// ───────────────────────────── audit, outbox, counters ─────────────────────────────
+
+/// Append-only (DB trigger). Written in the same transaction as the change it records.
+model AuditEvent {
+  id         String   @id @default(cuid())
+  at         DateTime @default(now())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id])
+  rfqId      String?
+  rfq        Rfq?     @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  quoteId    String?
+  quote      Quote?   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  entityType String
+  entityId   String
+  action     String
+  summary    String
+  data       Json?
+
+  @@index([rfqId, at])
+  @@index([entityType, entityId])
+}
+
+/// Mock email: "sending" a quote records the message and the exact PDF bytes sent.
+model OutboxMessage {
+  id          String     @id @default(cuid())
+  quoteId     String
+  quote       Quote      @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  to          String
+  cc          String?
+  subject     String
+  body        String
+  pdfFileId   String
+  pdfFile     StoredFile @relation(fields: [pdfFileId], references: [id])
+  createdById String
+  createdBy   User       @relation(fields: [createdById], references: [id])
+  createdAt   DateTime   @default(now())
+}
+
+/// Monotonic sequences, e.g. key "RFQ-2611" → last RFQ number issued that month.
+model Counter {
+  key   String @id
+  value Int
+}
