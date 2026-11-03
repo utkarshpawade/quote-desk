@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+/*
+ * Quote Desk design tokens.
+ * Calm and precise: warm white canvas, white surfaces, hairline borders, three ink steps,
+ * one steel-blue accent, muted status hues and a single violet reserved for AI-sourced values.
+ */
+@theme {
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  /* type scale: 12 / 13 / 14 / 16 / 20 */
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-dense: 0.8125rem;
+  --text-dense--line-height: 1.25rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.375rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-title: 1.25rem;
+  --text-title--line-height: 1.75rem;
+
+  /* surfaces */
+  --color-canvas: #f7f7f5;
+  --color-surface: #ffffff;
+  --color-subtle: #f3f3f0;
+  --color-hover: #efefeb;
+  --color-line: #e5e4e0;
+  --color-line-strong: #d2d1cb;
+
+  /* ink */
+  --color-ink: #191b1f;
+  --color-ink-2: #4a4f57;
+  --color-ink-3: #6b7079;
+  --color-ink-4: #9aa0a8;
+
+  /* accent */
+  --color-accent: #1f4e79;
+  --color-accent-hover: #183e61;
+  --color-accent-soft: #eaf0f6;
+  --color-accent-line: #c7d6e6;
+
+  /* AI-sourced values awaiting acceptance */
+  --color-ai: #6941c6;
+  --color-ai-soft: #f5f2fd;
+  --color-ai-line: #ddd3f6;
+
+  /* feedback */
+  --color-ok: #067647;
+  --color-ok-soft: #ecf6ef;
+  --color-warn: #b54708;
+  --color-warn-soft: #fdf4e9;
+  --color-danger: #b42318;
+  --color-danger-soft: #fdeeed;
+
+  /* status dots */
+  --color-st-estimating: #5d6b82;
+  --color-st-approval: #c27a12;
+  --color-st-approved: #0e7c66;
+  --color-st-sent: #1f4e79;
+  --color-st-won: #067647;
+  --color-st-lost: #b42318;
+  --color-st-muted: #9aa0a8;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+
+  --shadow-pop: 0 1px 2px rgb(16 24 40 / 0.04), 0 8px 24px -4px rgb(16 24 40 / 0.12);
+  --shadow-drawer: -12px 0 32px -12px rgb(16 24 40 / 0.18);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm--line-height);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Plex Sans figures are tabular by default; keep it explicit for other fonts. */
+  .num {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--color-accent-soft);
+  }
+
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
