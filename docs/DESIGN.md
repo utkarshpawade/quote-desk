@@ -1,9 +1,16 @@
 # Quote Desk — design notes
 
-Working design for Company A's RFQ-to-quote costing app (brief #1). This file is the
-source of truth while building; the Technical Design Document is derived from it.
-Every assumption is labelled **A-n** and collected in §12. Revision 2 folds in an
-internal review (domain, requirements, UX and architecture lenses).
+Working design for Company A's RFQ-to-quote costing app (brief #1). This file was the
+source of truth while building; the Technical Design Document ([TDD.md](TDD.md)) is derived
+from it and records what was finally built. Every assumption is labelled **A-n** and collected
+in §12. Revision 2 folds in an internal review (domain, requirements, UX and architecture lenses).
+
+> **Status.** Built as described here, except: review keyboard shortcuts, "simulate incoming
+> RFQ", "apply margin to all parts", the approver's provenance summary line, rate bulk update with
+> change-impact preview and the file-access log screen were cut (TDD §10). Similar parts open as a
+> page (`/past-quotes?similar=…`) rather than a drawer; drawing processes missing from the routing
+> show as a warning line rather than ghost rows; past-quote search matches every word with
+> `LIKE` on the trigram index; assumptions A-28 to A-32 were added in the TDD.
 
 ---
 
