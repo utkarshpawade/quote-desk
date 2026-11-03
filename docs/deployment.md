@@ -40,7 +40,7 @@ npm run db:seed             # demo data, about 15 seconds
 npm run dev                 # http://localhost:3000
 ```
 
-The seed loads the rate masters with history from 2023, seven people, eight customers, the
+The seed loads the rate masters with history from 2023, seven people, seven customers (Company B–H), the
 1,400-row legacy quote register (through the same import as the Import screen), 23 RFQs replayed
 through the real services at past dates (drafts, quotes awaiting approval, sent, won and lost), and
 two RFQs waiting in intake review. Dates are relative to the day it runs. `npm run db:reset`

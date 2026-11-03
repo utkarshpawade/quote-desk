@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 560" width="1000" height="560" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif">
+  <title>Quote Desk architecture</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4a5260"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1000" height="560" fill="#ffffff"/>
+
+  <!-- Browser -->
+  <rect x="16" y="64" width="208" height="300" rx="10" fill="#f6f7f9" stroke="#cfd4da"/>
+  <text x="32" y="92" font-size="15" font-weight="600" fill="#15191f">Browser</text>
+  <text x="32" y="112" font-size="12" fill="#646c7a">React 19 · Tailwind 4</text>
+  <g font-size="12.5" fill="#15191f">
+    <text x="32" y="146">RFQ register</text>
+    <text x="32" y="168">Intake review</text>
+    <text x="32" y="190">Part costing</text>
+    <text x="32" y="212">Quote and approval</text>
+    <text x="32" y="234">Rate masters</text>
+    <text x="32" y="256">Past quotes · Import</text>
+  </g>
+  <rect x="28" y="280" width="184" height="70" rx="6" fill="#eef3f8" stroke="#c9d8e7"/>
+  <text x="40" y="302" font-size="12" font-weight="600" fill="#2b5b8a">Costing engine</text>
+  <text x="40" y="320" font-size="11.5" fill="#4a5260">same code as the server,</text>
+  <text x="40" y="337" font-size="11.5" fill="#4a5260">recalculates as you type</text>
+
+  <!-- Next.js app -->
+  <rect x="268" y="24" width="452" height="512" rx="12" fill="#ffffff" stroke="#2b5b8a" stroke-width="1.5"/>
+  <text x="288" y="52" font-size="15" font-weight="600" fill="#15191f">Next.js 16 app on Vercel</text>
+  <text x="288" y="71" font-size="12" fill="#646c7a">one deployable · functions in Singapore (sin1)</text>
+
+  <rect x="288" y="86" width="412" height="36" rx="6" fill="#f6f7f9" stroke="#cfd4da"/>
+  <text x="302" y="109" font-size="12.5" fill="#15191f"><tspan font-weight="600">proxy.ts</tspan> — no session cookie, no page</text>
+
+  <rect x="288" y="134" width="128" height="92" rx="6" fill="#f6f7f9" stroke="#cfd4da"/>
+  <text x="300" y="156" font-size="12.5" font-weight="600" fill="#15191f">Server</text>
+  <text x="300" y="172" font-size="12.5" font-weight="600" fill="#15191f">components</text>
+  <text x="300" y="194" font-size="11.5" fill="#4a5260">reads through</text>
+  <text x="300" y="210" font-size="11.5" fill="#4a5260">services</text>
+
+  <rect x="430" y="134" width="128" height="92" rx="6" fill="#f6f7f9" stroke="#cfd4da"/>
+  <text x="442" y="156" font-size="12.5" font-weight="600" fill="#15191f">Server actions</text>
+  <text x="442" y="178" font-size="11.5" fill="#4a5260">defineAction:</text>
+  <text x="442" y="194" font-size="11.5" fill="#4a5260">session · permission</text>
+  <text x="442" y="210" font-size="11.5" fill="#4a5260">· zod input</text>
+
+  <rect x="572" y="134" width="128" height="92" rx="6" fill="#f6f7f9" stroke="#cfd4da"/>
+  <text x="584" y="156" font-size="12.5" font-weight="600" fill="#15191f">Route handlers</text>
+  <text x="584" y="178" font-size="11.5" fill="#4a5260">uploads · extraction</text>
+  <text x="584" y="194" font-size="11.5" fill="#4a5260">files · PDF · import</text>
+  <text x="584" y="210" font-size="11.5" fill="#4a5260">· demo-reset cron</text>
+
+  <rect x="288" y="240" width="412" height="96" rx="6" fill="#ffffff" stroke="#8a939f"/>
+  <text x="302" y="262" font-size="12.5" font-weight="600" fill="#15191f">Services <tspan font-weight="400" fill="#646c7a">src/server/services · each checks the role</tspan></text>
+  <text x="302" y="284" font-size="12" fill="#4a5260">RFQs · quotes · quote lifecycle (submit, approve, send) · rates</text>
+  <text x="302" y="302" font-size="12" fill="#4a5260">rate admin · intake · past quotes · import · audit · counters</text>
+  <text x="302" y="322" font-size="12" fill="#4a5260">PDF renderer (react-pdf, IBM Plex with the ₹ sign)</text>
+
+  <rect x="288" y="350" width="412" height="112" rx="6" fill="#eef3f8" stroke="#c9d8e7"/>
+  <text x="302" y="372" font-size="12.5" font-weight="600" fill="#2b5b8a">Domain <tspan font-weight="400" fill="#4a5260">src/domain — pure TypeScript, no I/O, unit tested</tspan></text>
+  <text x="302" y="394" font-size="12" fill="#15191f">costing engine (exact decimals) · approval rule · margin ladder</text>
+  <text x="302" y="412" font-size="12" fill="#15191f">rate resolution and back-dating checks · statuses · calendar</text>
+  <text x="302" y="430" font-size="12" fill="#15191f">intake: normalise · ground · confidence · merge</text>
+  <text x="302" y="448" font-size="12" fill="#15191f">similar parts · RM-adjusted prices · legacy row checks</text>
+
+  <rect x="288" y="476" width="412" height="44" rx="6" fill="#f6f7f9" stroke="#cfd4da"/>
+  <text x="302" y="495" font-size="12" fill="#15191f"><tspan font-weight="600">Prisma 7</tspan> + node-postgres adapter · canonical JSON</text>
+  <text x="302" y="511" font-size="12" fill="#15191f">snapshots + SHA-256 · compare-and-set transitions</text>
+
+  <!-- Database -->
+  <rect x="764" y="270" width="220" height="190" rx="12" fill="#f6f7f9" stroke="#cfd4da"/>
+  <ellipse cx="874" cy="270" rx="110" ry="14" fill="#ffffff" stroke="#cfd4da"/>
+  <text x="780" y="310" font-size="15" font-weight="600" fill="#15191f">PostgreSQL</text>
+  <text x="780" y="328" font-size="12" fill="#646c7a">Neon · AWS Singapore</text>
+  <g font-size="11.5" fill="#4a5260">
+    <text x="780" y="356">append-only audit and</text>
+    <text x="780" y="372">snapshots (triggers)</text>
+    <text x="780" y="392">rate versions: void only;</text>
+    <text x="780" y="408">one live version per date</text>
+    <text x="780" y="428">pg_trgm search · RFQ counter</text>
+    <text x="780" y="444">files (bytea) + access log</text>
+  </g>
+
+  <!-- Groq -->
+  <rect x="764" y="64" width="220" height="150" rx="10" fill="#f4f2fb" stroke="#d9d2f0"/>
+  <text x="780" y="92" font-size="15" font-weight="600" fill="#5b45b0">Groq API</text>
+  <text x="780" y="112" font-size="12" fill="#4a5260">gpt-oss-120b, strict JSON</text>
+  <text x="780" y="128" font-size="12" fill="#4a5260">vision model for photos</text>
+  <text x="780" y="154" font-size="11.5" fill="#15191f">receives email body and</text>
+  <text x="780" y="170" font-size="11.5" fill="#15191f">title-block text only</text>
+  <text x="780" y="192" font-size="11.5" fill="#4a5260">no training · zero retention</text>
+
+  <!-- Cron -->
+  <rect x="764" y="484" width="220" height="52" rx="8" fill="#ffffff" stroke="#cfd4da"/>
+  <text x="780" y="506" font-size="12.5" font-weight="600" fill="#15191f">Vercel Cron</text>
+  <text x="780" y="524" font-size="11.5" fill="#4a5260">03:00 IST demo reset</text>
+
+  <!-- Arrows -->
+  <line x1="224" y1="180" x2="286" y2="180" stroke="#4a5260" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="229" y="168" font-size="10.5" fill="#646c7a">HTTPS</text>
+  <path d="M700,498 H736 V380 H762" fill="none" stroke="#4a5260" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M700,262 H736 V150 H762" fill="none" stroke="#5b45b0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+  <text x="750" y="246" font-size="10.5" fill="#5b45b0" transform="rotate(-90 750 246)">intake text</text>
+  <line x1="764" y1="510" x2="722" y2="510" stroke="#4a5260" stroke-width="1.2" stroke-dasharray="3 4" marker-end="url(#arrow)"/>
+</svg>

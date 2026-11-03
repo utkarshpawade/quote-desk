@@ -23,6 +23,7 @@
     "db:reset": "prisma migrate reset --force && prisma db seed",
     "sample-data": "tsx --env-file-if-exists=.env scripts/generate-sample-data.ts",
     "eval:intake": "tsx --env-file-if-exists=.env scripts/eval-intake.ts",
+    "docs:tdd": "tsx scripts/build-tdd.ts",
     "format": "prettier --write .",
     "postinstall": "prisma generate"
   },
@@ -57,6 +58,7 @@
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.2",
     "fast-check": "4.10.2",
+    "marked": "18.1.1",
     "prettier": "3.9.10",
     "prettier-plugin-tailwindcss": "0.8.1",
     "prisma": "7.10.1",

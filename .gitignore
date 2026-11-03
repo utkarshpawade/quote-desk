@@ -29,3 +29,6 @@ Thumbs.db
 
 # generated prisma client (prisma generate runs on install)
 src/generated/
+
+# Rendered documents (npm run docs:tdd); the Markdown is the source
+docs/*.pdf
