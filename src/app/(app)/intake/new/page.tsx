@@ -27,7 +27,7 @@ export default async function NewRfqPage() {
         title="New RFQ"
         meta="Drop the customer's email — its Excel part list and drawings come with it — or add the files one by one. Every value read from them waits for your decision."
       />
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <IntakeStart samples={SAMPLE_PACKS.map((p) => ({ ...p }))} />
         <div className="flex flex-col gap-5">
           <Section title="How documents are read">

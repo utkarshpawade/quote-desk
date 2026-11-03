@@ -110,7 +110,7 @@ export function IntakeReviewView({ review, currentUser }: { review: IntakeReview
   const missingDue = !review.fields.some((f) => !f.partKey && f.fieldKey === "dueDate");
 
   return (
-    <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+    <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
       <div className="flex min-w-0 flex-col gap-4">
         <AiBanner review={review} />
 
@@ -282,7 +282,7 @@ function FieldRow({
   const decide = (action: "ACCEPT" | "EDIT" | "REJECT" | "UNDO", v: string | null = null) => onAct(() => decideFieldAction({ sessionId, fieldId: f.id, action, value: v }));
 
   return (
-    <li className={cn("grid gap-x-3 gap-y-1 px-4 py-2.5 sm:grid-cols-[150px_minmax(0,1fr)_auto]", !decided && "border-l-2 border-l-ai")}>
+    <li className={cn("grid grid-cols-[minmax(0,1fr)] gap-x-3 gap-y-1 px-4 py-2.5 sm:grid-cols-[150px_minmax(0,1fr)_auto]", !decided && "border-l-2 border-l-ai")}>
       <div className="text-dense font-medium text-ink-2">
         {f.label}
         {f.required ? <span className="text-danger"> *</span> : null}
@@ -378,7 +378,7 @@ function TypedRow({ sessionId, partKey, fieldKey, onAct }: { sessionId: string; 
   const [value, setValue] = useState("");
   const spec = FIELDS.find((f) => f.key === fieldKey)!;
   return (
-    <li className="grid gap-x-3 gap-y-1 border-l-2 border-l-warn px-4 py-2.5 sm:grid-cols-[150px_minmax(0,1fr)_auto]">
+    <li className="grid grid-cols-[minmax(0,1fr)] gap-x-3 gap-y-1 border-l-2 border-l-warn px-4 py-2.5 sm:grid-cols-[150px_minmax(0,1fr)_auto]">
       <div className="text-dense font-medium text-ink-2">
         {spec.label} <span className="text-danger">*</span>
       </div>
@@ -459,7 +459,7 @@ function SourcePane({ sources, active, highlight, onSelect }: { sources: Source[
                 const text = raw.replace(/^L\d{3}: ?/, "");
                 const hit = line === n;
                 return (
-                  <li key={i} ref={hit ? lineRef : undefined} className={cn("grid grid-cols-[2.5rem_1fr] gap-2 rounded px-1", hit && "bg-[#FDF0C2]")}>
+                  <li key={i} ref={hit ? lineRef : undefined} className={cn("grid grid-cols-[2.5rem_minmax(0,1fr)] gap-2 rounded px-1 break-words", hit && "bg-[#FDF0C2]")}>
                     <span className="text-right text-ink-4 select-none">{active.kind === "EMAIL" || active.kind === "PASTED_TEXT" ? n : ""}</span>
                     <span className="break-words whitespace-pre-wrap">{text || " "}</span>
                   </li>

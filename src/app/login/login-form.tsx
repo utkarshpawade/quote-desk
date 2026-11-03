@@ -82,7 +82,7 @@ export function LoginForm({
                   </p>
                   <p className="truncate text-xs text-ink-3">{account.hint}</p>
                 </div>
-                <Button size="sm" onClick={() => signInAs(account.email)} disabled={pending}>
+                <Button size="sm" onClick={() => signInAs(account.email)} disabled={pending} aria-label={`Sign in as ${account.name}`}>
                   Sign in
                 </Button>
               </li>
