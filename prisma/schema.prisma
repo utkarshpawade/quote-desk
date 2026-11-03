@@ -109,6 +109,8 @@ model Customer {
   segment       Segment
   city          String
   emailDomain   String?     @unique
+  /// Postal address lines for the quote document.
+  address       String?
   contactName   String?
   contactEmail  String?
   paymentTerms  String
@@ -206,8 +208,9 @@ model RfqPart {
   notes            String?
   createdAt        DateTime  @default(now())
 
-  quoteLines  QuoteLine[]
-  provenances FieldProvenance[]
+  quoteLines      QuoteLine[]
+  provenances     FieldProvenance[]
+  extractedFields ExtractedField[]
 
   @@unique([rfqId, lineNo])
 }
@@ -583,6 +586,9 @@ model ExtractedField {
   /// "" for RFQ-level fields, otherwise the normalized part key the field belongs to.
   partKey       String        @default("")
   partLabel     String?
+  /// Set when the RFQ is created: undecided values carry into the part and block its submission.
+  rfqPartId     String?
+  rfqPart       RfqPart?      @relation(fields: [rfqPartId], references: [id], onDelete: SetNull)
   fieldKey      String
   proposedValue String?
   /// Every candidate value with its source, locator, evidence, confidence and grounding result.
