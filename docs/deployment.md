@@ -4,7 +4,7 @@ Quote Desk is one Next.js application (UI, server actions and API routes) with a
 database. It runs the same way on a laptop and on Vercel; only the database location and a few
 environment variables differ.
 
-- **Live demo:** _added when the app is deployed_
+- **Live demo:** https://quote-desk-xi.vercel.app
 - **Repository:** https://github.com/utkarshpawade/quote-desk
 
 ## Demo sign-in
@@ -78,27 +78,40 @@ this on every push (`.github/workflows/ci.yml`).
 
 | Piece | Where | Why |
 |---|---|---|
-| App | Vercel (functions in `sin1`, Singapore) | Next.js host with no servers to manage; functions run next to the database, because a page makes many database round trips and that latency matters more than browser-to-server distance |
-| Database | Neon serverless PostgreSQL (AWS `ap-southeast-1`) | Managed Postgres with `pg_trgm`, pooled connections for serverless functions |
+| App | Vercel, functions in `cle1` (Cleveland, AWS us-east-2) | Next.js host with no servers to manage; functions run next to the database, because a page makes many database round trips and that latency matters more than browser-to-server distance |
+| Database | Neon serverless PostgreSQL (AWS `us-east-2`, Ohio) | Managed Postgres with `pg_trgm`, pooled connections for serverless functions |
 | AI | Groq API | Fast open-weight models; Groq does not train on API data |
 | Nightly reset | Vercel Cron → `/api/cron/reset-demo` at 03:00 IST | Keeps the shared demo fresh for every reviewer |
 
-Steps:
+Steps (this is how the live demo was deployed, with the Vercel CLI):
 
-1. **Database.** Create a Neon project in AWS Singapore. Copy the pooled connection string (host
-   contains `-pooler`) for `DATABASE_URL` and the direct one for `DIRECT_URL`.
-2. **Schema and demo data,** once, from your machine:
+1. **Database.** Create a Neon project. Copy the pooled connection string (host contains
+   `-pooler`) for `DATABASE_URL` and the same string without `-pooler` for `DIRECT_URL`. Put the
+   functions in the Vercel region nearest to it: `regions` in `vercel.json` (`cle1` for
+   us-east-2).
+2. **Schema,** once, from your machine (migrations never run inside the Vercel build):
    ```bash
    DATABASE_URL="<pooled>" DIRECT_URL="<direct>" npm run db:deploy
-   DATABASE_URL="<pooled>" DIRECT_URL="<direct>" npm run db:seed
    ```
-   Later schema changes are applied the same way with `db:deploy` before the new code is promoted.
-3. **App.** Import the GitHub repository in Vercel (framework: Next.js; build command from
-   `package.json`: `prisma generate && next build`). Add the environment variables below for
-   Production. `vercel.json` sets the region and the nightly cron.
-4. **Groq.** Create an API key and turn on Zero Data Retention for the organisation, so prompts
+   Later schema changes are applied the same way before the new code is promoted.
+3. **App.**
+   ```bash
+   npx vercel link --project quote-desk
+   npx vercel env add DATABASE_URL production     # and the other variables below
+   npx vercel deploy --prod
+   ```
+   Importing the GitHub repository in the Vercel dashboard works the same way (framework
+   Next.js; build command from `package.json`: `prisma generate && next build`).
+4. **Demo data.** Seed from inside the region rather than across the world: call the reset route
+   once with the cron secret (about 30 seconds; it also runs every night).
+   ```bash
+   curl -H "Authorization: Bearer $CRON_SECRET" https://<your-app>/api/cron/reset-demo
+   ```
+5. **Groq.** Create an API key and turn on Zero Data Retention for the organisation, so prompts
    are not kept even for abuse monitoring.
-5. Open the deployment, sign in with a demo account, and check the AI banner on "New RFQ".
+6. Open the deployment, sign in with a demo account, and run a sample on "New RFQ": the banner
+   names the model. `BASE_URL=https://<your-app> npm run test:e2e` runs the end-to-end tests
+   against it (then reset the demo).
 
 ### Environment variables (names only)
 
@@ -122,6 +135,8 @@ No secrets are committed: `.env` is git-ignored and `.env.example` holds placeho
 
 - Uploads are capped at 4 MB per file (Vercel's request limit) and 60 MB per person per day; AI
   extraction at 40 calls per person per hour.
+- The demo's Groq key is on the free tier: 8,000 tokens a minute, about four documents. Beyond that
+  intake falls back to the rule-based reader and says so; a paid tier removes the limit.
 - Files are stored in PostgreSQL (`bytea`), which is fine for a demo; production would move them to
   encrypted object storage.
 - "Send to customer" writes to an outbox and stores the exact PDF; no email leaves the system.

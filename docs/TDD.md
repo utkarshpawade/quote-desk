@@ -5,7 +5,7 @@ RFQ-to-quote costing for Company A, Chakan (brief 1: auto-component maker). 4 No
 | | |
 |---|---|
 | **GitHub** | [github.com/utkarshpawade/quote-desk](https://github.com/utkarshpawade/quote-desk) |
-| **Live app** | _added on deployment_ |
+| **Live app** | [quote-desk-xi.vercel.app](https://quote-desk-xi.vercel.app) — reset nightly at 03:00 IST |
 | **Demo sign-in** | Estimator `rohan.deshpande@companya.example` · Sales head `vikram.joshi@companya.example` · password `Chakan@2026` |
 | **Run locally** | `docs/deployment.md` in the repository (also in the submission ZIP) |
 
@@ -245,8 +245,8 @@ source and needs estimator acceptance" — is the design centre.
    browser and transcribed by a vision model.
 2. **Extraction.** `openai/gpt-oss-120b` on Groq with a strict JSON schema: for each field, the value,
    the verbatim evidence and the line number, or null. The prompt treats the document as untrusted
-   data. Temperature 0; 20 s per attempt and a 45 s budget, honouring `retry-after`; results cached by
-   prompt version, model and text.
+   data. Temperature 0; 20 s per attempt and a 45 s budget, honouring `retry-after`, and one more try
+   when the model's output breaks the schema; results cached by prompt version, model and text.
 3. **Normalisation.** Indian grouping (1,80,000), lakh / k / crore, monthly schedules × 12, grams to
    kg, day-first dates with ambiguous ones flagged (A-12), grades and aliases from the rate master
    (EN-8, 080M40 → EN8), customer from the sender's domain (A-22).
@@ -296,7 +296,7 @@ than 20 % heavier or lighter, and keep unknown legacy names unbound until a work
 counts not only correct values but what happens when a value is wrong: *flagged* (shown as Low or a
 conflict, or left empty) versus *silent* (wrong but pre-filled at Medium or High) and *invented*.
 The rule-based reader fills 54 of 95 fields and never fills a wrong or invented value — the right
-profile for a fallback; a test pins that. The AI reader is scored by the same script whenever a Groq key is set; its results are in `docs/intake-eval.md`.
+profile for a fallback; a test pins that. The AI reader (`gpt-oss-120b` on Groq) read 93 of 95 fields correctly in the latest run (94 in another), never filled a wrong or invented value, kept all 9 absent fields empty and ignored the injected instruction; its misses are left for the estimator. Full results: `docs/intake-eval.md`.
 
 <!-- newpage -->
 ## 7. UI and design decisions
@@ -326,9 +326,11 @@ Errors replace numbers with "—" and say why; the similar-parts median sits und
 
 ![Intake review](screens/intake-review.png)
 
-*Intake review.* Decide by uncertainty: values that agree across sources can be accepted together;
-everything else one at a time. The source pane highlights the evidence line. Undecided values stay
-violet.
+*Intake review, read by the AI on the live site.* The banner names the model and says when a
+result came from the cache; the Excel columns needed no AI and are confirmed once each; the customer
+named by the sender's domain and by the drawing agree. Values that agree across sources can be
+accepted together, everything else one at a time; the source pane shows exactly the text the AI
+was given, with the evidence line highlighted. Undecided values stay violet.
 
 ![Quote approval](screens/quote-approval.png)
 
@@ -352,7 +354,7 @@ import report (every rejected row with its cell and reason) and the RFQ's files 
 |---|---|
 | Unit (Vitest) | Costing engine: the three sample parts to the paisa at three volumes; property tests (printed lines always add up; setup and amortised tooling per piece never rise with volume; save → reload → recompute is identical); approval boundary (₹25,00,000.00 by rule, ₹25,00,000.01 to the sales head); rate resolution, back-dating and voiding; canonical snapshot hashing; status transitions; IST working days; intake normalisation, grounding, confidence and merge; Excel mapping; legacy-row validation; similarity; Groq client failure paths (mocked); PDF content |
 | Integration (Vitest on real PostgreSQL) | 20 parallel RFQ creations get 20 consecutive numbers; the seeded database: every frozen quote re-assembles to its stored hash; a new rate re-prices drafts but not frozen quotes; back-dating and voiding are refused; re-importing the register adds nothing |
-| End to end (Playwright) | Estimator submits, sales head approves and sends, and the stored PDF's text carries the quote number, ₹ and 120.46; every screen at 360 × 740 has no sideways scrolling |
+| End to end (Playwright) | Estimator submits, sales head approves and sends, and the stored PDF's text carries the quote number, ₹ and 120.46; every screen at 360 × 740 has no sideways scrolling. Run in CI and against the live deployment |
 | Guards | About 260 Vitest tests in all. Every server action must be built with `defineAction`; the rule-based reader may never fill a wrong value on the eval set |
 | CI (GitHub Actions) | Lint, type check, unit and integration tests on PostgreSQL 17, then the production build and Playwright |
 
@@ -430,6 +432,8 @@ also reset it.
 - No holiday calendar (A-11); no tonnage-band material pricing; GST/HSN need the client's
   confirmation (A-8).
 - The vision model is a preview model on Groq and may be renamed; it is configuration.
+- The demo runs on Groq's free tier: 8,000 tokens a minute, about four documents. Beyond that,
+  intake falls back to the rule-based reader and says so; a paid tier removes the limit.
 
 **Next, in order of value to the client's targets:**
 

@@ -585,7 +585,7 @@ Calm, precise, quiet — an engineering ledger, not a dashboard.
 - **PDF:** `@react-pdf/renderer` in a Node route, fonts registered at module scope from a static
   `process.cwd()` path and traced with `outputFileTracingIncludes`; IBM Plex has the ₹ glyph and
   tabular figures; rendered only from the frozen snapshot (drafts: live preview, watermarked DRAFT).
-- **Hosting:** Vercel region `sin1` next to Neon `aws-ap-southeast-1`; `DATABASE_URL` = Neon pooled
+- **Hosting:** Vercel functions next to the Neon database (planned `sin1` / Singapore; deployed `cle1` / us-east-2 where the database was created); `DATABASE_URL` = Neon pooled
   host (runtime), `DIRECT_URL` = direct host (migrations only). Migrations run by hand or from CI —
   never in the Vercel build. `pg_trgm` is enabled by the first migration; search uses `similarity()`
   in `WHERE`/`ORDER BY` (no session `SET`, which leaks across pooled connections).

@@ -27,7 +27,7 @@
   <!-- Next.js app -->
   <rect x="268" y="24" width="452" height="512" rx="12" fill="#ffffff" stroke="#2b5b8a" stroke-width="1.5"/>
   <text x="288" y="52" font-size="15" font-weight="600" fill="#15191f">Next.js 16 app on Vercel</text>
-  <text x="288" y="71" font-size="12" fill="#646c7a">one deployable · functions in Singapore (sin1)</text>
+  <text x="288" y="71" font-size="12" fill="#646c7a">one deployable · functions in Cleveland (cle1)</text>
 
   <rect x="288" y="86" width="412" height="36" rx="6" fill="#f6f7f9" stroke="#cfd4da"/>
   <text x="302" y="109" font-size="12.5" fill="#15191f"><tspan font-weight="600">proxy.ts</tspan> — no session cookie, no page</text>
@@ -71,7 +71,7 @@
   <rect x="764" y="270" width="220" height="190" rx="12" fill="#f6f7f9" stroke="#cfd4da"/>
   <ellipse cx="874" cy="270" rx="110" ry="14" fill="#ffffff" stroke="#cfd4da"/>
   <text x="780" y="310" font-size="15" font-weight="600" fill="#15191f">PostgreSQL</text>
-  <text x="780" y="328" font-size="12" fill="#646c7a">Neon · AWS Singapore</text>
+  <text x="780" y="328" font-size="12" fill="#646c7a">Neon · AWS us-east-2 (Ohio)</text>
   <g font-size="11.5" fill="#4a5260">
     <text x="780" y="356">append-only audit and</text>
     <text x="780" y="372">snapshots (triggers)</text>

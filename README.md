@@ -7,7 +7,7 @@ annual value go to the sales head for approval; the customer receives a PDF.
 
 ![Part costing: inputs on the left, the cost build-up at three volumes on the right](docs/screens/costing.png)
 
-- **Live demo:** _added when deployed_ · sign in as the estimator `rohan.deshpande@companya.example`
+- **Live demo:** https://quote-desk-xi.vercel.app · sign in as the estimator `rohan.deshpande@companya.example`
   or the sales head `vikram.joshi@companya.example`, password `Chakan@2026`
 - **Run locally / deployment / environment variables:** [docs/deployment.md](docs/deployment.md)
 - **Design notes** (formulas, worked examples, every assumption labelled A-1…A-27):
