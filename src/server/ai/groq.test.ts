@@ -37,6 +37,15 @@ describe("Groq client", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
+  it("retries once when the model's output broke the strict schema, then gives up", async () => {
+    const schemaFailure = () => new Response(JSON.stringify({ error: { code: "json_validate_failed", message: "Generated JSON does not match the expected schema." } }), { status: 400 });
+    const recovers = vi.fn().mockResolvedValueOnce(schemaFailure()).mockResolvedValueOnce(ok({ lines: ["B"] }));
+    expect((await chatJson(request, { fetchImpl: recovers, sleep: noSleep })).json).toEqual({ lines: ["B"] });
+    const fails = vi.fn().mockResolvedValueOnce(schemaFailure()).mockResolvedValueOnce(schemaFailure());
+    await expect(chatJson(request, { fetchImpl: fails, sleep: noSleep })).rejects.toMatchObject({ reason: "INVALID_OUTPUT" });
+    expect(fails).toHaveBeenCalledTimes(2);
+  });
+
   it("gives up at once when the wait would exceed the time budget", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(new Response("{}", { status: 429, headers: { "retry-after": "60" } }));
     await expect(chatJson(request, { fetchImpl, sleep: noSleep, budgetMs: 45_000 })).rejects.toMatchObject({ reason: "RATE_LIMITED" });

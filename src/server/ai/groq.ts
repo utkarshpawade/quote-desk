@@ -108,7 +108,15 @@ export async function chatJson(request: ChatJsonRequest, options: ChatJsonOption
       continue;
     }
 
-    // 400 from a schema mismatch (best-effort mode) or any other client error: no retry.
+    // Strict mode answers 400 `json_validate_failed` when the model's own output broke the schema:
+    // a generation failure, not a bad request, so it is tried once more. Other 4xx: no retry.
+    if (response.status === 400) {
+      const error = (await response.json().catch(() => null)) as { error?: { code?: string } } | null;
+      if (error?.error?.code === "json_validate_failed") {
+        if (attempt < 2 && remaining() > 3_000) continue;
+        throw new AiUnavailableError("INVALID_OUTPUT", "The AI answer did not match the expected structure.");
+      }
+    }
     throw new AiUnavailableError(response.status === 400 ? "INVALID_OUTPUT" : "HTTP_ERROR", `The AI service refused the request (${response.status}).`);
   }
 }
