@@ -5,7 +5,7 @@ database. It runs the same way on a laptop and on Vercel; only the database loca
 environment variables differ.
 
 - **Live demo:** _added when the app is deployed_
-- **Repository:** _added when the repository is published_
+- **Repository:** https://github.com/utkarshpawade/quote-desk
 
 ## Demo sign-in
 
@@ -30,7 +30,7 @@ database. Any PostgreSQL 16+ server works instead of Docker if you point `DATABA
 `pg_trgm` extension must be available (it ships with PostgreSQL).
 
 ```bash
-git clone <repository-url> quote-desk
+git clone https://github.com/utkarshpawade/quote-desk.git
 cd quote-desk
 npm install                 # also generates the Prisma client
 cp .env.example .env        # the defaults match the Docker database below

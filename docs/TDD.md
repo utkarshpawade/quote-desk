@@ -4,7 +4,7 @@ RFQ-to-quote costing for Company A, Chakan (brief 1: auto-component maker). 4 No
 
 | | |
 |---|---|
-| **GitHub** | _added on publication_ |
+| **GitHub** | [github.com/utkarshpawade/quote-desk](https://github.com/utkarshpawade/quote-desk) |
 | **Live app** | _added on deployment_ |
 | **Demo sign-in** | Estimator `rohan.deshpande@companya.example` · Sales head `vikram.joshi@companya.example` · password `Chakan@2026` |
 | **Run locally** | `docs/deployment.md` in the repository (also in the submission ZIP) |
