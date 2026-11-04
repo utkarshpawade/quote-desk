@@ -3,9 +3,9 @@ import { isGrounded, rateConfidence } from "./confidence";
 import { emailAddress, numberLines, unwrapForwarded } from "./email";
 import { mapColumns } from "./excel-columns";
 import { mergeCandidates, type Candidate } from "./merge";
-import { matchMaterial, parseAnnualVolume, parseDate, parseIndianNumber, parseWeightKg } from "./normalize";
+import { matchCustomer, matchMaterial, parseAnnualVolume, parseDate, parseIndianNumber, parseWeightKg } from "./normalize";
 import { processHints } from "./process-hints";
-import { toCandidate, type SourceInfo } from "./read";
+import { finishedWeightOnDrawing, toCandidate, type SourceInfo } from "./read";
 import { readByRules } from "./rules";
 
 const materials = [
@@ -213,5 +213,32 @@ describe("email helpers, columns and process hints", () => {
 
   it("finds process cues in drawing notes", () => {
     expect(processHints("NOTES: 1. INDUCTION HARDEN 50-55 HRC  2. THREAD ROLL M20x1.5")).toEqual(["induction hardening", "thread rolling"]);
+  });
+});
+
+describe("customers and drawings", () => {
+  const customers = [{ name: "Company D" }, { name: "Company DE Forge" }];
+
+  it("matches a customer written longer or in capitals to the master", () => {
+    expect(matchCustomer("COMPANY D — DRIVETRAINS", customers)?.name).toBe("Company D");
+    expect(matchCustomer("Company DE Forge Pvt Ltd", customers)?.name).toBe("Company DE Forge");
+    expect(matchCustomer("Company Delta", customers)).toBeNull();
+  });
+
+  it("so a title block's customer agrees with the sender's instead of conflicting", () => {
+    const block = numberLines("CUSTOMER: COMPANY D — DRIVETRAINS");
+    const c = toCandidate({ fieldKey: "customerName", raw: "COMPANY D — DRIVETRAINS", evidence: "CUSTOMER: COMPANY D — DRIVETRAINS", locator: "title block" }, { id: "d", kind: "DRAWING_PDF", label: "Drawing", text: block, mode: "AI" }, { materials, customers })!;
+    expect(c).toMatchObject({ value: "Company D", confidence: "MEDIUM" });
+    const header: Candidate = { ...c, value: "Company D", display: "Company D", sourceId: "mail:headers", sourceKind: "EMAIL", mode: "PARSER", confidence: "HIGH", reason: "read from the cell" };
+    expect(mergeCandidates([header, c])[0]).toMatchObject({ proposedValue: "Company D", conflict: false, agreed: true });
+  });
+
+  it("reads an unlabelled drawing weight as the finished weight", () => {
+    const read = finishedWeightOnDrawing([
+      { fieldKey: "grossWeightKg", raw: "1.12 KG", evidence: "WEIGHT: 1.12 KG", locator: "title block" },
+      { fieldKey: "grossWeightKg", raw: "1.48 KG", evidence: "GROSS WT: 1.48 KG", locator: "title block" },
+      { fieldKey: "grossWeightKg", raw: "1.30 KG", evidence: "FORGING WEIGHT 1.30 KG", locator: "title block" },
+    ]);
+    expect(read.map((v) => v.fieldKey)).toEqual(["netWeightKg", "grossWeightKg", "grossWeightKg"]);
   });
 });

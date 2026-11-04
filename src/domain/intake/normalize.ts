@@ -1,5 +1,6 @@
 import type { IsoDate } from "../calendar";
 import { normalizeGrade } from "../rates/catalog";
+import { normalizeText } from "../text";
 
 /**
  * Parsers that turn what customers write into canonical values, each reporting how much it had
@@ -134,6 +135,19 @@ export function matchMaterial(text: string, materials: MaterialOption[]): { id: 
     if (byAlias) return { id: byAlias.id, grade: byAlias.grade, via: "alias" };
   }
   return null;
+}
+
+/**
+ * A customer name as written ("COMPANY D — DRIVETRAINS") matched to the master ("Company D"):
+ * the same name, or the name followed by more words. The longest master name wins.
+ */
+export function matchCustomer<T extends { name: string }>(text: string, customers: T[]): T | null {
+  const t = normalizeText(text);
+  const hits = customers.filter((c) => {
+    const n = normalizeText(c.name);
+    return n.length > 0 && (t === n || t.startsWith(`${n} `));
+  });
+  return hits.sort((a, b) => b.name.length - a.name.length)[0] ?? null;
 }
 
 /** The customer, from the sender's email domain. */

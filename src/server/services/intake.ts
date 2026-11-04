@@ -5,7 +5,7 @@ import { emailAddress, htmlToText, numberLines, unwrapForwarded } from "@/domain
 import { FIELD_BY_KEY } from "@/domain/intake/fields";
 import { mergeCandidates, type Candidate } from "@/domain/intake/merge";
 import { customerFromEmail, matchMaterial, parseAnnualVolume, parseDate, parseWeightKg, type MaterialOption } from "@/domain/intake/normalize";
-import { toCandidate, type RawValue, type SourceInfo } from "@/domain/intake/read";
+import { finishedWeightOnDrawing, toCandidate, type RawValue, type SourceInfo } from "@/domain/intake/read";
 import { readByRules } from "@/domain/intake/rules";
 import type { Prisma } from "@/generated/prisma/client";
 import { AiUnavailableError, aiConfig } from "@/server/ai/groq";
@@ -210,7 +210,8 @@ export async function extractSource(db: Db, user: User, sourceId: string): Promi
   const aiAllowed = Boolean(aiConfig().apiKey) && customer?.aiAllowed !== false && (await aiBudgetLeft(db, user.id));
   const noAiReason = !aiConfig().apiKey ? "no AI key configured" : customer?.aiAllowed === false ? `AI disabled under ${customer.name}'s NDA` : "hourly AI limit reached";
   const receivedDate = typeof meta.date === "string" && !Number.isNaN(Date.parse(meta.date)) ? toIstDate(new Date(meta.date)) : toIstDate(source.session.createdAt);
-  const ctx = { materials, receivedDate };
+  const customers = await db.customer.findMany({ select: { name: true } });
+  const ctx = { materials, customers, receivedDate };
 
   let raw: RawValue[] = [];
   let text = "";
@@ -270,7 +271,7 @@ export async function extractSource(db: Db, user: User, sourceId: string): Promi
         return { status: "NO_TEXT", mode: null, message: "No readable text in this PDF." };
       }
       text = drawing.titleBlockText;
-      raw = (await readText(source.label, text, "TITLE_BLOCK")).map((v) => ({ ...v, locator: v.locator?.startsWith("line") ? "title block" : v.locator, part: v.part ?? {} }));
+      raw = finishedWeightOnDrawing(await readText(source.label, text, "TITLE_BLOCK")).map((v) => ({ ...v, locator: v.locator?.startsWith("line") ? "title block" : v.locator, part: v.part ?? {} }));
       update.text = text;
       update.meta = { ...meta, hints: drawing.hints, usedRegion: drawing.usedRegion } as unknown as Prisma.InputJsonValue;
       if (run.mode === "AI") await db.fileAccess.create({ data: { fileId: source.fileId!, userId: user.id, action: "AI_EXTRACT", detail: `${drawing.usedRegion === "title-block" ? "Title block" : "Full page"} text, ${text.length} chars` } });
@@ -278,7 +279,7 @@ export async function extractSource(db: Db, user: User, sourceId: string): Promi
       if (!aiAllowed) throw new AiUnavailableError("NO_KEY", `Drawing images can only be read by the AI (${noAiReason}). Type the values instead.`);
       const transcription = await transcribeImage(Buffer.from(source.file!.data).toString("base64"));
       text = transcription.text;
-      raw = (await readText(`${source.label} (transcribed)`, text, "TITLE_BLOCK")).map((v) => ({ ...v, locator: "title block (image)", part: v.part ?? {} }));
+      raw = finishedWeightOnDrawing(await readText(`${source.label} (transcribed)`, text, "TITLE_BLOCK")).map((v) => ({ ...v, locator: "title block (image)", part: v.part ?? {} }));
       update.text = text;
       await db.fileAccess.create({ data: { fileId: source.fileId!, userId: user.id, action: "AI_EXTRACT", detail: `Image sent to ${transcription.model} for transcription` } });
     }

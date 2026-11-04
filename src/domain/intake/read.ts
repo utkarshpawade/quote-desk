@@ -2,7 +2,7 @@ import type { IsoDate } from "../calendar";
 import { checkPlausible, evidenceSupports, isGrounded, rateConfidence, type Mode } from "./confidence";
 import { FIELD_BY_KEY } from "./fields";
 import type { Candidate, SourceKind } from "./merge";
-import { matchMaterial, parseAnnualVolume, parseDate, parseWeightKg, type MaterialOption } from "./normalize";
+import { matchCustomer, matchMaterial, parseAnnualVolume, parseDate, parseWeightKg, type MaterialOption } from "./normalize";
 
 /**
  * One code path from "what a source said" to a scored Candidate, shared by the AI extractor, the
@@ -32,7 +32,19 @@ export interface SourceInfo {
 
 export interface ReadContext {
   materials: MaterialOption[];
+  /** Customer master, so "COMPANY D — DRIVETRAINS" and "Company D" agree instead of conflicting. */
+  customers?: Array<{ name: string }>;
   receivedDate?: IsoDate;
+}
+
+/**
+ * A drawing describes the finished part: a weight in a title block is the net weight unless it is
+ * labelled gross, input, forging or cut — whichever field the reader put it in.
+ */
+export function finishedWeightOnDrawing(values: RawValue[]): RawValue[] {
+  return values.map((v) =>
+    v.fieldKey === "grossWeightKg" && !/\b(gross|input|forg\w*|cut|blank|raw)\b/i.test(v.evidence ?? v.raw) ? { ...v, fieldKey: "netWeightKg" } : v,
+  );
 }
 
 export function toCandidate(raw: RawValue, source: SourceInfo, ctx: ReadContext): Candidate | null {
@@ -85,6 +97,14 @@ export function toCandidate(raw: RawValue, source: SourceInfo, ctx: ReadContext)
     default:
       value = text.replace(/\s+/g, " ");
       display = value;
+      if (raw.fieldKey === "customerName" && ctx.customers) {
+        const known = matchCustomer(text, ctx.customers);
+        if (known && known.name !== value) {
+          notes.push(`“${value}” is ${known.name} in the customer master`);
+          value = known.name;
+          display = `${known.name} (written “${text}”)`;
+        }
+      }
   }
 
   const evidence = raw.evidence?.trim() || null;
