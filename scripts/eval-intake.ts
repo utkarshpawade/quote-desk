@@ -21,11 +21,12 @@ const ctx = { materials, receivedDate: RECEIVED };
 
 type Run = { name: string; results: FieldResult[]; failures: string[]; ms: number };
 
-async function run(name: string, read: (c: EvalCase) => Promise<FieldResult[]>): Promise<Run> {
+async function run(name: string, read: (c: EvalCase) => Promise<FieldResult[]>, paceMs = 0): Promise<Run> {
   const results: FieldResult[] = [];
   const failures: string[] = [];
   const started = Date.now();
-  for (const c of EVAL_CASES) {
+  for (const [index, c] of EVAL_CASES.entries()) {
+    if (paceMs && index > 0) await new Promise((resolve) => setTimeout(resolve, paceMs));
     // The eval measures accuracy, not throughput: a case refused by the provider's rate limit
     // waits a minute and is tried once more (the app itself falls back to rules instead).
     for (let attempt = 1; ; attempt++) {
@@ -100,7 +101,7 @@ async function main() {
       await run(`AI (${textModel})`, async (c) => {
         const { values } = await extractWithAi({ label: c.title, text: emailText(c) });
         return scoreCase(c, proposalsFor(c, values, "AI", ctx));
-      }),
+      }, 20_000), // Groq's free tier allows 8,000 tokens a minute; one extraction uses ~2,100
     );
   } else {
     console.log("GROQ_API_KEY is not set: only the rule-based reader is evaluated.");

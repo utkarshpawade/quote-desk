@@ -13,7 +13,7 @@ Each case lists what a careful estimator would take from the email. Every field 
 | Reader | Fields | Correct | Flagged | Silent | Missed | Held back (of absent) | Invented | Time |
 |---|---|---|---|---|---|---|---|---|
 | Rule-based reading | 95 | 54 (57 %) | 0 | **0** | 41 | 9 of 9 | **0** | 0.0 s |
-| AI (openai/gpt-oss-120b) | 95 | 94 (99 %) | 0 | **0** | 1 | 9 of 9 | **0** | 141.2 s |
+| AI (openai/gpt-oss-120b) | 95 | 93 (98 %) | 0 | **0** | 2 | 9 of 9 | **0** | 249.5 s |
 
 ## Rule-based reading
 
@@ -45,6 +45,6 @@ Each case lists what a careful estimator would take from the email. Every field 
 | 07-table — Two parts as a plain-text table | 12/12 | 0 | 0 | 0 | 0 |
 | 08-k-decimal-comma — 120k per annum, decimal commas, dotted date | 8/8 | 0 | 0 | 0 | 0 |
 | 09-missing — Volumes and material not given — must stay empty | 1/1 | 0 | 0 | 0 | 0 |
-| 10-unknown-grade — A grade outside the master and a possible future volume | 6/7 | 0 | 0 | 1 | 0 |
+| 10-unknown-grade — A grade outside the master and a possible future volume | 5/7 | 0 | 0 | 2 | 0 |
 | 11-grams-words — Weights in grams written out; usage instead of volume | 7/7 | 0 | 0 | 0 | 0 |
 | 12-revised-date — An old due date and a revised one | 8/8 | 0 | 0 | 0 | 0 |
