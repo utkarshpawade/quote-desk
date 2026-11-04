@@ -1,0 +1,12 @@
+# Never upload local secrets or build output to Vercel
+.env
+.env.*
+!.env.example
+.git
+.vercel
+node_modules
+.next
+test-results
+playwright-report
+tsconfig.tsbuildinfo
+docs/*.pdf

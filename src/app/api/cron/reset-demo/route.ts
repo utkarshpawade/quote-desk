@@ -4,7 +4,8 @@ import { isCronRequest, resetDemo } from "@/server/demo-reset";
 import { UserError } from "@/server/errors";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// The first reset also makes the first AI calls for the seeded intakes; later ones hit the cache.
+export const maxDuration = 300;
 
 /** Nightly demo reset (vercel.json: 21:30 UTC = 03:00 IST). Not behind the session proxy. */
 export async function GET(request: Request) {

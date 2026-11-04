@@ -6,7 +6,7 @@ import { db } from "@/server/db";
 import { isDemoMode } from "@/server/demo";
 
 // Server actions run within the page's limit; the sales head's demo reset needs the most.
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
