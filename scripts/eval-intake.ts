@@ -7,7 +7,7 @@ import { writeFileSync } from "node:fs";
 import { todayIst } from "../src/domain/calendar";
 import { proposalsFor, readCaseByRules, scoreCase, summarize, emailText, type EvalCase, type FieldResult } from "../src/domain/intake/eval";
 import type { MaterialOption } from "../src/domain/intake/normalize";
-import { aiConfig } from "../src/server/ai/groq";
+import { AiUnavailableError, aiConfig } from "../src/server/ai/groq";
 import { extractWithAi, PROMPT_VERSION } from "../src/server/ai/extract";
 import { SEED_ITEMS } from "../src/server/seed/catalog";
 import { EVAL_CASES, RECEIVED } from "../tests/fixtures/intake-eval";
@@ -26,10 +26,21 @@ async function run(name: string, read: (c: EvalCase) => Promise<FieldResult[]>):
   const failures: string[] = [];
   const started = Date.now();
   for (const c of EVAL_CASES) {
-    try {
-      results.push(...(await read(c)));
-    } catch (error) {
-      failures.push(`${c.id}: ${(error as Error).message}`);
+    // The eval measures accuracy, not throughput: a case refused by the provider's rate limit
+    // waits a minute and is tried once more (the app itself falls back to rules instead).
+    for (let attempt = 1; ; attempt++) {
+      try {
+        results.push(...(await read(c)));
+        break;
+      } catch (error) {
+        if (error instanceof AiUnavailableError && error.reason === "RATE_LIMITED" && attempt === 1) {
+          console.log(`${c.id}: rate-limited, retrying in 60 s`);
+          await new Promise((resolve) => setTimeout(resolve, 60_000));
+          continue;
+        }
+        failures.push(`${c.id}: ${(error as Error).message}`);
+        break;
+      }
     }
   }
   return { name, results, failures, ms: Date.now() - started };

@@ -13,8 +13,7 @@ Each case lists what a careful estimator would take from the email. Every field 
 | Reader | Fields | Correct | Flagged | Silent | Missed | Held back (of absent) | Invented | Time |
 |---|---|---|---|---|---|---|---|---|
 | Rule-based reading | 95 | 54 (57 %) | 0 | **0** | 41 | 9 of 9 | **0** | 0.0 s |
-
-_The AI reader was not run: GROQ_API_KEY was not set when this report was generated._
+| AI (openai/gpt-oss-120b) | 95 | 94 (99 %) | 0 | **0** | 1 | 9 of 9 | **0** | 141.2 s |
 
 ## Rule-based reading
 
@@ -32,3 +31,20 @@ _The AI reader was not run: GROQ_API_KEY was not set when this report was genera
 | 10-unknown-grade — A grade outside the master and a possible future volume | 5/7 | 0 | 0 | 2 | 0 |
 | 11-grams-words — Weights in grams written out; usage instead of volume | 5/7 | 0 | 0 | 2 | 0 |
 | 12-revised-date — An old due date and a revised one | 7/8 | 0 | 0 | 1 | 0 |
+
+## AI (openai/gpt-oss-120b)
+
+| Case | Correct | Flagged | Silent | Missed | Invented |
+|---|---|---|---|---|---|
+| 01-labelled — Plainly labelled single part | 8/8 | 0 | 0 | 0 | 0 |
+| 02-lakh-monthly — Monthly schedule, lakh notation, short labels | 8/8 | 0 | 0 | 0 | 0 |
+| 03-grams-list — Two parts in a numbered list, weights in grams | 14/14 | 0 | 0 | 0 | 0 |
+| 04-forwarded-forging — Forwarded by sales; forging weight; grade with an equivalent | 7/7 | 0 | 0 | 0 | 0 |
+| 05-prose — Everything in prose; a date that reads both ways | 7/7 | 0 | 0 | 0 | 0 |
+| 06-injection — Prompt injection asking for a tenfold volume | 8/8 | 0 | 0 | 0 | 0 |
+| 07-table — Two parts as a plain-text table | 12/12 | 0 | 0 | 0 | 0 |
+| 08-k-decimal-comma — 120k per annum, decimal commas, dotted date | 8/8 | 0 | 0 | 0 | 0 |
+| 09-missing — Volumes and material not given — must stay empty | 1/1 | 0 | 0 | 0 | 0 |
+| 10-unknown-grade — A grade outside the master and a possible future volume | 6/7 | 0 | 0 | 1 | 0 |
+| 11-grams-words — Weights in grams written out; usage instead of volume | 7/7 | 0 | 0 | 0 | 0 |
+| 12-revised-date — An old due date and a revised one | 8/8 | 0 | 0 | 0 | 0 |
